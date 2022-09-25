@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-This module is a header file for the program's enumerated data types.
+This module is a header for the program's enumerated data types.
 
 @author: Darren Vawter
 """
@@ -13,11 +13,9 @@ from enum import IntEnum; # Allow for integer enumeration types
 class BCI_Mode(IntEnum):
 
     # Default overlay which mirrors the full screen onto the P300 interface
-    DEFAULT_OVERLAY = 1;
-    # Magnified overlay which mirrors some portion of the screen onto the P300 interface
-    MAGNIFIED_OVERLAY = 2;
+    OVERLAY_INTERFACE = 1;
     # Keyboard interface which displays a P300 keyboard to the user
-    KEYBOARD_INTERFACE = 3;
+    KEYBOARD_INTERFACE = 2;
     
     """
     Example specialty overlays forincreased data throughput:
@@ -32,6 +30,12 @@ class BCI_Mode(IntEnum):
 #   Enumerate BCI Interaction Options   #
 #########################################
 class BCI_Interaction(IntEnum):
+    
+    ############################
+    #   Program Interactions   #
+    ############################
+    # Exit the program
+    EXIT = 0;
     
     ##########################
     #   Mouse Interactions   #
@@ -60,6 +64,8 @@ class BCI_Interaction(IntEnum):
     #############################
     # Revert to the previous level of magnification
     REVERT_MAGNIFICATION = 20;
+    # Magnify overlay according to selected tile
+    MAGNIFY_TILE = 21;
     
     """
     Example specialty interactions for increased throughput:
