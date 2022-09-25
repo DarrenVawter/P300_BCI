@@ -21,9 +21,10 @@ class BCI_Mode(IntEnum):
     Example specialty overlays forincreased data throughput:
         SPECIAL_OVERLAY = N;
         DESKTOP_OVERLAY = 10;
-        FILE_EXPLORER_OVERLAY = 11;
-        CHESS_OVERLAY = 12;
-        YOUTUBE_OVERLAY = 13;
+        TASK_MANAGER_OVERLAY = 11;
+        FILE_EXPLORER_OVERLAY = 12;
+        CHESS_OVERLAY = 13;
+        YOUTUBE_OVERLAY = 14;
     """
     
 #########################################
@@ -81,3 +82,58 @@ class BCI_Interaction(IntEnum):
         BROWSER_REFRESH = 32;  
                 
     """
+    
+#####################################
+#   Enumerate stimuli trial codes   #
+#####################################
+class Stimuli_Trial(IntEnum):
+    
+    # Trial is not the start of a new classification and is a not a sync trial
+    NON_SYNC = 0;
+    # Trial is not the start of a new classification but is a sync trial
+    SYNC = 1;
+    # Trial is the start of a new classification but is a not a sync trial
+    NON_SYNC_START = 2;
+    # Trial is the start of a new classification and is a sync trial
+    SYNC_START = 3;
+    # Trial is a training trial
+    # code = -1 * target_id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

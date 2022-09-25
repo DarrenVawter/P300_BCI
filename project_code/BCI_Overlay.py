@@ -5,8 +5,6 @@ This module displays a screen overlay running a P300 speller to the user.
 @author: Darren Vawter
 """
 
-#TODO: calculate the appropriate overlay display area dynamically
-
 # External Modules
 import numpy as np; # fast arrays&manipulation
 import math; # floor
@@ -14,13 +12,14 @@ import pygame; # display to the screen and play sounds
 import d3dshot; # grab screen pixels
 
 # Internal Modules
-from BCI_Enumerations import BCI_Interaction; # Definitions for enumerated data types
-from BCI_Constants import SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, BLACK, GRAY;
+from BCI_Enumerations import BCI_Interaction; # definitions for enumerated data types
+#from BCI_Constants import *; # pull constants from header
+from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
 ###########################################################
-def Run(canvas, magnification_rect):
+def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     #TODO: remove this    
     # Track framerate/item performance
@@ -119,6 +118,76 @@ def Run(canvas, magnification_rect):
             flash_bucket = np.delete(flash_bucket,min_choice);
         
         # End of Choose_Flash_Tiles()
+        pass;    
+        
+    """
+    
+    Get_Tile_Rect()
+    
+        This function returns the bounding rect of a tile given its id. The
+        bounding rect is defined as the portion of the screen being mirrored
+        through that rect on the overlay.
+    
+        arguments:
+            [tile_id]: int --> the id of the tile to return the rect of
+        returns:
+            [tile_rect]: [int, int, int, int] --> the left, top, right, & bottom of the tile's rect
+        exceptions:
+            TypeError: if tile_id is not an int
+            ValueError: if tile_id is not within the range [0, N_TILES) or if the tile_id is not from a magnification tile
+            
+    
+        --> Convert overlay tile dimensions to screen dimensions
+        
+        --> Calc the tile's column  
+                
+        --> Calculate tile's left relative to the screen by multiplying the column by the tile-to-screen conversion factor
+        
+        --> Calculate the tile's right by adding one tile-to-screen conversion factor to the left
+        
+        --> Calculate tile's top relative to the screen by multiplying the column by the tile-to-screen conversion factor
+        
+        --> Calculate the tile's bottom by adding one tile-to-screen conversion factor to the top
+        
+        --> Return the rect
+            
+    """
+    def Get_Tile_Rect(tile_id):
+        
+        # Validate tile_id type
+        if(type(tile_id) != int):
+            raise TypeError("[tile_id] must be an integer.");
+            
+        # Validate tile_id value
+        if(tile_id<0 or tile_id>=N_TILES):
+            raise ValueError("[tile_id] must be in the range [0, N_TILES).")  
+            
+        # Calc the tile's column  
+        col = tile_id % N_TILE_COLUMNS;
+        
+        # Calc the tile's row
+        row = math.floor(tile_id / N_TILE_COLUMNS);
+            
+        # Verify that the tile id represents a magnification tile
+        if(col == N_TILE_COLUMNS-1 or row == N_TILE_ROWS-1):
+            raise ValueError("[tile_id] must be the id of a magnification tile.")
+        
+        # Convert overlay tile dimensions to screen dimensions
+        tile_screen_width_conversion = (magnification_rect[2]-magnification_rect[0])/(N_TILE_COLUMNS-1);
+        tile_screen_height_conversion = (magnification_rect[3]-magnification_rect[1])/(N_TILE_ROWS-1);
+        
+        # Calculate tile's left/right relative to the screen using the overlay's magnification rect
+        left = math.floor(magnification_rect[0] + col * tile_screen_width_conversion);
+        right = math.ceil(left + tile_screen_width_conversion);
+        
+        # Calculate tile's top/bottom relative to the screen using the overlay's magnification rect
+        top = math.floor(magnification_rect[1] + row * tile_screen_height_conversion);
+        bottom = math.ceil(top + tile_screen_height_conversion);
+                    
+        # Return the rect
+        return [left, top, right, bottom];
+        
+        # End of Get_Tile_Rect()
         pass;
         
     ##############################
@@ -129,9 +198,6 @@ def Run(canvas, magnification_rect):
     #   Initialize overlay constants   #
     ####################################
             
-    # Number of rows/cols to divide the overlay into
-    N_TILE_ROWS = 10;
-    N_TILE_COLUMNS = 10;
     
     # Calculate the dimensions of the overlay portion of the screen
     OVERLAY_WIDTH = round(SCREEN_WIDTH*(1-1/N_TILE_COLUMNS));
@@ -148,8 +214,6 @@ def Run(canvas, magnification_rect):
     # Number of tiles in the overlay interface
     N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
     
-    # Number of tiles in each flash
-    N_TILES_PER_FLASH = 10;
     
     # Amount of time, in seconds, to flash each group for
     FLASH_DURATION = 0.1;
@@ -193,38 +257,93 @@ def Run(canvas, magnification_rect):
     # Randomized indices to reference the flash images
     flash_image_indices = np.arange(N_FLASH_IMAGES);
         
+    # Track whether or not the current trial is the start of a new trial
+    start_new_classification = False;
+        
+    #TODO: remove
+    print(Get_Tile_Rect(88));
+    
     #########################
     #   Main Overlay Loop   #
     #########################
     overlay_running = True;
     while(overlay_running): 
         
-        ################################
-        #   Check for external input   #
-        ################################
+        #############################
+        #   Handle external input   #
+        #############################
         
         #TODO: this
         
         # Check LSL for input
+        processor_input, _ = processor_inlet.pull_sample(0.0);
+        if(processor_input is not None):
         
-            # Check if input is updated probabilities
+            # Convert the input to a np array
+            processor_input = np.array(processor_input);
             
-                # Update tile probabilities
-        
-            # Check if input is tile classification
-            
-                # Check if classified tile is a BCI control option
+            # Grab the flag from the end of the array
+            processor_flag = processor_input[-1];
                 
+            # Check if input is a tile classification
+            if(processor_flag < 0):
+            
+                # Typecheck and convert the flag to the classification id
+                if(processor_flag.is_integer()):
+                    classification_id = int(-(processor_flag+1));
+                else:
+                    raise TypeError("Received non-integer classification ID from processor.");
+                    
+                # Check if classified tile is a BCI control option
+                if(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
+
                     # Return appropriate BCI control interaction
+                    pass;
                 
                 # Check if classified tile is an overlay control option
+                elif(math.floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
                     # Return appropriate BCI control interaction
-                
+                    pass;
+                    
                 # Else, classified tile is a magnification tile
-                
+                else:
+                    
                     # Return appropriate BCI control interaction
+                    return (BCI_Interaction.MAGNIFY_TILE, Get_Tile_Rect(classification_id));
+                    
+                # Flag to start a new classification
+                start_new_classification = True;
+                
+            # Else, input is updated probabilities
+            else:
+            
+                # Update tile probabilities
+                tile_probabilities = processor_input;
+                
         
+        ##########################
+        #   Handle flash group   #
+        ##########################
+        
+        # Check if the current flash group's timer has expired
+        if(time.time() > flash_timer + FLASH_DURATION):
+        
+            # Pick the next flash group
+            Choose_Flash_Tiles();
+                        
+            # Send the flash data to the processor
+            #TODO: this
+            
+            # Reset new classification flag
+            start_new_classification = False;
+            
+            # Randomize the order of the flash images
+            np.random.shuffle(flash_image_indices);
+            
+            # Reset the flash timer for this group
+            flash_timer = time.time();
+            
         ##########################
         #   Clear frame buffer   #
         ##########################
@@ -259,29 +378,10 @@ def Run(canvas, magnification_rect):
         ###################################
                 
         #TODO: this
-        
-        ####################################
-        #   Handle change of flash group   #
-        ####################################
-        
-        # Check if the current flash group's timer has expired
-        if(time.time() > flash_timer + FLASH_DURATION):
-        
-            # Pick the next flash group
-            Choose_Flash_Tiles();
-                        
-            # Send the flash data to the processor
-            #TODO: this
-            
-            # Randomize the order of the flash images
-            np.random.shuffle(flash_image_indices);
-            
-            # Reset the flash timer for this group
-            flash_timer = time.time();
-        
-        ####################################
-        #   Render the appropriate tiles   #
-        ####################################
+                
+        ######################################################
+        #   Render flash images over the appropriate tiles   #
+        ######################################################
         
         # Iterate over the tiles in the flash group
         for i in range(N_TILES_PER_FLASH):
@@ -301,15 +401,19 @@ def Run(canvas, magnification_rect):
         
         # Render tile boundaries
         for i in range(N_TILE_COLUMNS):
-            pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/10),0), (round(SCREEN_WIDTH*i/10),1080), width=3);
+            pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
         for i in range(N_TILE_ROWS):
-            pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/10)), (1920,round(SCREEN_HEIGHT*i/10)), width=3);
+            pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
         
         # Cap fps
         clock.tick(FRAMERATE_CAP);
                
         # Display the buffered frame to the screen
         pygame.display.flip();
+        
+        ###############################
+        #   Check for pygame events   #
+        ###############################
         
         # Check to see if the program was closed through physical controls
         for event in pygame.event.get():
@@ -330,6 +434,8 @@ def Run(canvas, magnification_rect):
             print("~~~~~~~~~~~~~~~~");
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
+        # End of Main overlay loop
+        pass;
     
     
     

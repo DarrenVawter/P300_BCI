@@ -14,13 +14,25 @@ pygame objects necessary to display the screen or play sounds.
 ###############################
 
 # External Modules
-import pygame; # Display to the screen and play sounds
-import pyautogui; # Virtual monitor/mouse/keyboard
+import threading; # run processor in a separate thread 
+import pygame; # display to the screen and play sounds
+import pyautogui; # virtual monitor/mouse/keyboard
+from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_stream; # communicating with P300 Processor
 
 # Internal Modules
-from BCI_Enumerations import BCI_Mode, BCI_Interaction; # Definitions for enumerated data types
-import BCI_Overlay; # Run screen overlay using P300 speller
-import BCI_Keyboard; # Run keyboard using P300 speller 
+from BCI_Enumerations import BCI_Mode, BCI_Interaction; # definitions for enumerated data types
+from BCI_Constants import N_TILES, N_KEYS; # pull constants from header
+import BCI_Overlay; # run screen overlay using P300 speller
+import BCI_Keyboard; # run keyboard using P300 speller 
+import P300_Processor; # run the P300 data processor
+
+#######################################
+#   Initialize Controller Constants   #
+#######################################
+    
+# Grab the monitor dimensions
+SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size();
+SCREEN_DIMENSIONS = [SCREEN_WIDTH, SCREEN_HEIGHT];
 
 #######################################
 #   Initialize Controller Variables   #
@@ -28,16 +40,19 @@ import BCI_Keyboard; # Run keyboard using P300 speller
 
 # Initialize the current BCI mode to the default overlay
 current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
-    
-# Grab the monitor dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size();
-SCREEN_DIMENSIONS = [SCREEN_WIDTH, SCREEN_HEIGHT];
+
+# Initialize the overlay rect
+magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];
+
+#####################################
+#   Initialize Controller Objects   #
+#####################################
 
 # Initialize the pygame gui engine
 pygame.init();
 
-# Get the pygame screen object as the surface of the monitor
-screen = pygame.display.set_mode(SCREEN_DIMENSIONS);
+# Get the pygame surface object as the monitor
+canvas = pygame.display.set_mode(SCREEN_DIMENSIONS);
 
 # Set the pygame window's name
 pygame.display.set_caption("P300 BCI");
@@ -45,27 +60,75 @@ pygame.display.set_caption("P300 BCI");
 # Initialize the pygame audio mixer
 pygame.mixer.init();
 
+# Initialize the stimuli outlet
+info = StreamInfo("P300_Stimuli", "P300_Stimuli", max(N_TILES,N_KEYS)+1, 125, "int16","BCI_GUI");
+stimuli_outlet = StreamOutlet(info);
+
+# Initialize the processor outlet
+info = StreamInfo("P300_Processor", "P300_Processor", max(N_TILES,N_KEYS), 125, "int16","P300_Processor");
+processor_outlet = StreamOutlet(info);
+
+#############################
+#   Launch P300 processor   #
+#############################
+
+# Run the P300 processor in a new stream
+processor_thread = threading.Thread(target=P300_Processor.Run, args=(processor_outlet,));
+processor_thread.daemon = True;    
+processor_thread.start();
+
+# Wait for the processor to broadcast its stream
+inlet_stream = resolve_stream('type', 'P300_Processor');
+processor_inlet = StreamInlet(inlet_stream[0]);
+
 ############################
 #   Main Controller Loop   #
 ############################
-
 BCI_running = True;
 while(BCI_running):
     
-    # Check if the BCI is currently overlay mode
-    if(current_BCI_mode == BCI_Mode.OVERLAY_INTERFACE):    
-        (interaction, data) = BCI_Overlay.Run(screen,[0,0,SCREEN_WIDTH,SCREEN_HEIGHT]);    
-        #interaction = BCI_Overlay.Run(screen,[0,0,960,540]);    
+    #######################
+    #   Handle BCI mode   #
+    #######################
     
+    # Check if the BCI is currently in overlay mode
+    if(current_BCI_mode == BCI_Mode.OVERLAY_INTERFACE):   
+        
+        # Launch the BCI screen overlay
+        print(magnification_rect)
+        (interaction, data) = BCI_Overlay.Run(canvas, magnification_rect, stimuli_outlet, processor_inlet);    
+        
+    # Check if the BCI is currently in keyboard mode
+    elif(current_BCI_mode == BCI_Mode.KEYBOARD_INTERFACE):   
+        
+        # Launch the BCI keyboard
+        (interaction, data) = BCI_Keyboard.Run(stimuli_outlet, processor_inlet);    
+    
+    ################################
+    #   Handle BCI interactions    #
+    ################################
+    
+    # Check if the user magnified a tile
+    if(interaction == BCI_Interaction.MAGNIFY_TILE):
+        
+        # Update the magnification rect
+        magnification_rect = data;        
+        
     # Check if the program was closed through the BCI controls
-    if(interaction == BCI_Interaction.EXIT):
+    elif(interaction == BCI_Interaction.EXIT):
        pygame.quit();
        BCI_running = False;
        break;
     
+    ###############################
+    #   Check for pygame events   #
+    ###############################
+    
     # Check if the program was closed through physical controls
     for event in pygame.event.get():
        if(event.type == pygame.QUIT):
+           processor_outlet.__del__();
+           stimuli_outlet.__del__();
            pygame.quit();
            BCI_running = False;
            break;
