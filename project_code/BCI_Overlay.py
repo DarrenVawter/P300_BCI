@@ -8,19 +8,13 @@ This module displays a screen overlay running a P300 speller to the user.
 #TODO: calculate the appropriate overlay display area dynamically
 
 # External Modules
-import numpy as np;
-from skimage.transform import resize; # resize np array as image
+import numpy as np; # fast arrays&manipulation
 import math; # floor
-import pygame; # Display to the screen and play sounds
-import pyautogui; # Virtual monitor/mouse/keyboard
-import d3dshot; # Grab screen pixels
-
-#from PIL import Image, ImageGrab; # Form images from virtual monitor raw bytes
-#from mss import mss; # Grab raw bytes from virtual monitor
-#import cv2;
+import pygame; # display to the screen and play sounds
+import d3dshot; # grab screen pixels
 
 # Internal Modules
-from BCI_Enumerations import BCI_Mode, BCI_Interaction; # Definitions for enumerated data types
+from BCI_Enumerations import BCI_Interaction; # Definitions for enumerated data types
 from BCI_Constants import SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, BLACK, GRAY;
 
 ###########################################################
@@ -29,6 +23,7 @@ from BCI_Constants import SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, BLACK, GRA
 def Run(canvas, magnification_rect):
         
     #TODO: remove this    
+    # Track framerate/item performance
     import time;
     last_time = time.time();
     n_frames = 0;
@@ -188,10 +183,7 @@ def Run(canvas, magnification_rect):
     
     # Most recent probability of each tile
     tile_probabilities = np.ones((N_TILES,1))/N_TILES;
-    
-    # Probability that the user was not looking at any tile in the last few seconds
-    no_tile_probability = 1;
-    
+        
     # Tiles that are currently being flashed
     current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
     
@@ -210,6 +202,28 @@ def Run(canvas, magnification_rect):
         ################################
         #   Check for external input   #
         ################################
+        
+        #TODO: this
+        
+        # Check LSL for input
+        
+            # Check if input is updated probabilities
+            
+                # Update tile probabilities
+        
+            # Check if input is tile classification
+            
+                # Check if classified tile is a BCI control option
+                
+                    # Return appropriate BCI control interaction
+                
+                # Check if classified tile is an overlay control option
+                
+                    # Return appropriate BCI control interaction
+                
+                # Else, classified tile is a magnification tile
+                
+                    # Return appropriate BCI control interaction
         
         ##########################
         #   Clear frame buffer   #
@@ -238,10 +252,14 @@ def Run(canvas, magnification_rect):
         #   Render the BCI controls   #
         ###############################
         
+        #TODO: this
+        
         ###################################
         #   Render the overlay controls   #
         ###################################
                 
+        #TODO: this
+        
         ####################################
         #   Handle change of flash group   #
         ####################################
@@ -282,8 +300,9 @@ def Run(canvas, magnification_rect):
         ###################################
         
         # Render tile boundaries
-        for i in range(1,10):
+        for i in range(N_TILE_COLUMNS):
             pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/10),0), (round(SCREEN_WIDTH*i/10),1080), width=3);
+        for i in range(N_TILE_ROWS):
             pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/10)), (1920,round(SCREEN_HEIGHT*i/10)), width=3);
         
         # Cap fps
@@ -296,9 +315,10 @@ def Run(canvas, magnification_rect):
         for event in pygame.event.get():
            if(event.type == pygame.QUIT):               
                overlay_running = False;
-               return BCI_Interaction.EXIT;
+               return (BCI_Interaction.EXIT,None);
                
         #TODO: remove this   
+        # calc & print framerate/item performance
         this_time = time.time();    
         frame_time += (this_time-last_time);
         n_frames += 1;

@@ -16,6 +16,7 @@ pygame objects necessary to display the screen or play sounds.
 # External Modules
 import pygame; # Display to the screen and play sounds
 import pyautogui; # Virtual monitor/mouse/keyboard
+
 # Internal Modules
 from BCI_Enumerations import BCI_Mode, BCI_Interaction; # Definitions for enumerated data types
 import BCI_Overlay; # Run screen overlay using P300 speller
@@ -53,8 +54,8 @@ while(BCI_running):
     
     # Check if the BCI is currently overlay mode
     if(current_BCI_mode == BCI_Mode.OVERLAY_INTERFACE):    
-        interaction = BCI_Overlay.Run(screen,[0,0,SCREEN_WIDTH,SCREEN_HEIGHT]);    
-        #interaction = BCI_Overlay.Run(screen,[100,100,500,500]);    
+        (interaction, data) = BCI_Overlay.Run(screen,[0,0,SCREEN_WIDTH,SCREEN_HEIGHT]);    
+        #interaction = BCI_Overlay.Run(screen,[0,0,960,540]);    
     
     # Check if the program was closed through the BCI controls
     if(interaction == BCI_Interaction.EXIT):
