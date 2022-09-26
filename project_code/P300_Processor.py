@@ -28,18 +28,163 @@ from BCI_Constants import N_OUTPUTS;
 #############################
 def Run(processor_outlet):
     
+    #####################################
+    #   Initialize LSL inlet from BCI   #
+    #####################################
+
     # Grab an inlet to the BCI stream
+    print("[P300_Processor.py]: Resolving P300_Stimuli inlet...")
     inlet_stream = resolve_stream('type', 'P300_Stimuli');
-    BCI_inlet = StreamInlet(inlet_stream[0]);
+    stimulus_inlet = StreamInlet(inlet_stream[0]);
     
-    # Simulate a fake classification
+    ##########################
+    #   Initialize Filters   #
+    ##########################
+    
+    # Filter out US main line noise
+    # Create a 60Hz notch filter with -3dB attenuation @ +-1Hz
+    # Create a 120Hz notch filter with -3dB attenuation @ +-1Hz
+    
+    # Filter out flash frequency to remove SSVEP component from signal
+    # Create a flash-frequency filter with -3dB at +-0.2Hz
+    
+    # Create a butterworth BP filter with edges @ 1Hz and 40Hz
+    
+    ######################################
+    #   Initialize processor constants   #
+    ######################################
+    
+    # Define the degree of iterative correlation to perform
+    CORRELATION_DEGREE = 3;
+    
+    ######################################
+    #   Initialize processor variables   #
+    ######################################
+    
+    # Track whether the processor is waiting for the first trial of the new classification
+    waiting_start_new_classification = True; #TODO: init T or F?
+    
+    # Declare the correlation statistics
+    non_target_means = np.empty((CORRELATION_DEGREE,1));
+    non_target_stds = np.empty((CORRELATION_DEGREE,1));
+    non_target_cov = np.empty((CORRELATION_DEGREE,1));
+    target_means = np.empty((CORRELATION_DEGREE,1));
+    target_stds = np.empty((CORRELATION_DEGREE,1));
+    target_cov = np.empty((CORRELATION_DEGREE,1));
+    
+    # Initialize cell probabilities
+    cell_probabilities = np.empty(N_OUTPUTS);
+    
+    # Initialize threshold values
+    #TODO: this
+    
+    # Send restart request to BCI
+    restart_signal = np.zeros(N_OUTPUTS);
+    restart_signal[-1] = N_OUTPUTS;
+    processor_outlet.push_sample(restart_signal);
+    
+    #########################
+    #   Main Overlay Loop   #
+    #########################
+    processor_running = True;
+    while(processor_running):
+        
+        ###################################
+        #   Check for new stimulus data   #
+        ###################################
+        
+        
+        ##############################
+        #   Check for new EEG data   #
+        ##############################
+    
+    
+        ####################
+        #   Handle Epoch   #
+        ####################
+        
+        # Check if there are enough EEG samples to construct a complete epoch
+        # and that the corresponding stimulus data has already been collected
+    
+            #############################
+            #   Handle Training Epoch   #
+            #############################
+            
+            
+            ###################################
+            #   Handle Classification Epoch   #
+            ###################################
+    
+            # Check if this epoch is the trial of a new classification
+            
+                # Validate that a new char was expected
+                
+                # Update flag to show that classification data has started streaming
+                #waiting_start_new_classification = False;
+                
+                # Reset cell probabilities
+                #TODO: this
+
+                # Check if using NLP
+                #TODO: this
+                
+                    # Get updated threshold values 
+                    #TODO: this
+                                   
+            # Check if data being streamed is for the current classification
+            #if(!waiting_start_new_classification):
+                
+                # Normalize the epoch
+                
+                # Calculate the correlation coefficients
+                #np.correlate(x,y,"full");
+                
+                # Generate a relative probability that this trial was a non-target trial
+                
+                # Generate a relative probability that this trial was a target trial
+                
+                # Normalize the gnerated probabilities
+                
+                # Update the cell probabilities according to the probability of this trial
+                
+                # Weight previous probabilities
+                
+                # Find what is currently the most probable cell
+                
+                # Check if the most probable cell is above its threshold
+                
+                    # Broadcast the classification
+                    # (offset by 1 then multiply by -1 as per scheme)                
+                    
+                    # Flag that the processor is waiting for the BCI to start streaming current data
+                
+                # Else, a classification is not ready
+                
+                    # Send the BCI updated probabilities
+                
+            #######################################
+            #   Update variables for next epoch   #
+            #######################################
+       
+            # Increment current epoch index
+            
+            # Check if the index needs to roll over
+    
+    
+        pass;    
+    
+        
+    
+    # Simulate faux classifications
     import time;
         
+    # Simulate a tile magnification
     time.sleep(10);
     fake_classification = np.zeros(N_OUTPUTS).astype(int);
     fake_classification[-1] = -2;
     processor_outlet.push_sample(fake_classification);
     
+    # Simulate a right click
     time.sleep(10);
     fake_classification[-1] = -30;
     processor_outlet.push_sample(fake_classification);
