@@ -87,18 +87,18 @@ class Program_Interaction(IntEnum):
 #####################################
 #   Enumerate stimuli trial codes   #
 #####################################
-class Stimuli_Trial(IntEnum):
+class Stimuli_Code(IntEnum):
     
     # Trial is not the start of a new classification and is a not a sync trial
-    NON_SYNC = 0;
+    NON_SYNC = -1;
     # Trial is not the start of a new classification but is a sync trial
-    SYNC = 1;
+    SYNC = -2;
     # Trial is the start of a new classification but is a not a sync trial
-    NON_SYNC_START = 2;
+    NON_SYNC_START = -3;
     # Trial is the start of a new classification and is a sync trial
-    SYNC_START = 3;
+    SYNC_START = -4;
     # Trial is a training trial
-    # code = -1 * target_id
+    # code --> target_id
 
 
 

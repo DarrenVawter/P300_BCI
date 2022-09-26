@@ -17,17 +17,20 @@
 #TODO: port MATLAB processor into Python
     
 # External Modules
+import time;
 import numpy as np;
-from pylsl import StreamInlet, resolve_stream; # communicating with BCI
 from math import ceil;
+from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
+
 
 # Internal Modules
+from BCI_Enumerations import Stimuli_Code;
 from BCI_Constants import N_OUTPUTS, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
 
 #############################
 #   Processor Entry point   #
 #############################
-def Run(processor_outlet):
+def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
     ###############################
     #   Define Helper Functions   #
@@ -68,21 +71,24 @@ def Run(processor_outlet):
         
         # Check if stimulus_input is the shutdown signal
         if(np.sum(stimulus_input) == -N_OUTPUTS*(N_OUTPUTS+1)):
-            
+
+            #TODO: Re-wrap this, lol            
             # Flag for shutdown
             processor_running = False;
+            print("[P300_Processor.py]:","Shutting down...");  
+            
                     
         # Append the stimulus input to the stimulus data
-        stimuli_trial_data[stimuli_trial_index][:] = stimulus_input[:];
+        stimuli_trial_data[stimuli_trial_index,:] = stimulus_input[:];
         
         # Increment the next stimulus index
         stimuli_trial_index += 1;        
         
         # Check if the stimulus index needs to roll over
-        if(stimuli_trial_index > STIMULI_TO_HOLD):
+        if(stimuli_trial_index >= STIMULI_TO_HOLD):
             
             # Roll the stimulus index over to the start  
-            stimuli_trial_index = 1;
+            stimuli_trial_index = 0;
 
         # Increment the count of trials received    
         total_trials_received += 1;       
@@ -139,7 +145,7 @@ def Run(processor_outlet):
     """
     def Handle_Incoming_EEG_Chunk(EEG_chunk):
         
-        nonlocal EEG_samples, EEG_sample_index;
+        nonlocal EEG_samples, EEG_sample_index, processor_running;
         
         # Filter the chunk
         #TODO: this
@@ -148,7 +154,7 @@ def Run(processor_outlet):
         chunk_size = len(EEG_chunk);
             
         # Grab the indices of the first trial start, if any exist
-        trial_start_index = np.argmax(EEG_chunk[:][-1]!=0);
+        trial_start_index = np.argmax(EEG_chunk[:,-1]!=0);
                 
         # Check that this chunk does not cause data overflow
         if(EEG_sample_index+chunk_size <= MAX_SAMPLES_TO_HOLD):  
@@ -157,25 +163,25 @@ def Run(processor_outlet):
             if(EEG_sample_index > 0):
                 
                 # Append the chunk to the EEG data
-                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size][:] = EEG_chunk[:][:];
+                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size,:] = EEG_chunk[:,:];
                 
                 # Update the next EEG sample index
                 EEG_sample_index += chunk_size;
-                    
+                                    
             # Check if this chunk contains a trial start
-            elif(EEG_chunk[trial_start_index][-1] != 0):
+            elif(EEG_chunk[trial_start_index,-1] != 0):
                     
                 # Add the trial-data portion of the chunk to the EEG data
-                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size-trial_start_index][:] = EEG_chunk[trial_start_index:][:];                        
+                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size-trial_start_index,:] = EEG_chunk[trial_start_index:,:];                        
                 
                 # Update the next EEG sample index
                 EEG_sample_index += chunk_size - trial_start_index;
-                    
+                
             # Else, this chunk does not contain any trial information
             else:
                 
                 # Throw away the chunk by doing nothing with it
-                print("discarding chunk...");
+                #print("discarding chunk...");
                 pass;
             
         # Else, this chunk causes data overflow
@@ -183,6 +189,7 @@ def Run(processor_outlet):
             
             # Raise error
             raise MemoryError("Ran out of pre-allocated RAM to store EEG samples.");
+        
         
         # End of Handle_Incoming_EEG_Chunk()
         pass;
@@ -192,14 +199,14 @@ def Run(processor_outlet):
     Synchronize_Streams()
     
         This function checks if the streams are already synchronized. If they
-        are not, it synchronizes them using DRBG resynchronization.
+        are not, it synchronizes them using DRBG resynchronization. #TODO
     
         arguments:
             [none]
         returns:
             [none]
         exceptions:
-            [none]
+            [ValueError]: if the BCI sync flag is an invalid sync code
     
         --> Grab Cyton's sync code
             
@@ -213,30 +220,39 @@ def Run(processor_outlet):
     """
     def Synchronize_Streams():  
                
+        nonlocal processor_running;
+        
         # Grab Cyton's sync code
         # (negative trial stamp indicates a sync trial)
-        Cyton_sync_code = (EEG_samples[1][-1] < 0);    
+        
+        Cyton_sync_code = (EEG_samples[0,-1] < 0);    
         
         # Grab BCI's sync flag
-        BCI_sync_code = stimuli_trial_data[stimuli_trial_index][-1];
-        
+        BCI_sync_code = stimuli_trial_data[EEG_epoch_index,-1];
+                
         # >=0 --> training mode, check the cell code at that index
         if(BCI_sync_code >= 0):
-            BCI_sync_code = stimuli_trial_data[EEG_epoch_index][BCI_sync_code];
+            BCI_sync_code = stimuli_trial_data[EEG_epoch_index,BCI_sync_code];
             
-        # -1 --> non-sync trial, same classification, classification mode
-        # -3 --> non-sync trial, new classification, classification mode
-        elif(BCI_sync_code == -1 or BCI_sync_code == -3):
+        # Check if the BCI sync flag is a non-sync code
+        elif(BCI_sync_code == Stimuli_Code.NON_SYNC or BCI_sync_code == Stimuli_Code.NON_SYNC_START):
             BCI_sync_code = False;
             
-        # -2 --> sync trial, same classification, classification mode
-        # -4 --> sync trial, new classification, classification mode
-        else:
+        # Check if the BCI sync flag is a sync code
+        elif(BCI_sync_code == Stimuli_Code.SYNC or BCI_sync_code == Stimuli_Code.SYNC_START):
             BCI_sync_code = True;
-                    
+            
+        # Else, an invalid sync flag was received from the BCI stream
+        else:
+            raise ValueError("Invalid sync flag received from BCI stream.");
+            
         # Check for desynchronization
         if(Cyton_sync_code != BCI_sync_code):
-            
+                                     
+            print(EEG_epoch_index);
+            print(EEG_samples[:200,-1]);
+            print(stimuli_trial_data[:30,-1]);
+              
             # Raise error
             raise RuntimeError("Cyton/BCI desynchronization detected.");
             #TODO: handle this by adding synchronizer back in
@@ -278,19 +294,19 @@ def Run(processor_outlet):
     """
     def Construct_Epoch():   
         
-        nonlocal EEG_epoch_data, EEG_samples, EEG_sample_index;
+        nonlocal EEG_epoch_data, EEG_epoch_index, EEG_samples, EEG_sample_index, total_epochs_received;
         
         # Create the epoch
-        EEG_epoch_data[EEG_epoch_index][:][:] = EEG_samples[:SAMPLES_PER_EPOCH][:N_EEG_CHANNELS];
-        
+        EEG_epoch_data[EEG_epoch_index,:,:] = EEG_samples[:SAMPLES_PER_EPOCH,:N_EEG_CHANNELS];
+                         
         # Find the EEG sample index of the start of the next trial, if any
-        trial_start_index = np.argmax(EEG_samples[1:][-1]!=0);        
+        trial_start_index = np.argmax(EEG_samples[1:,-1]!=0)+1;
             
         # Check if a next-trial index was found
-        if(EEG_samples[trial_start_index][-1] != 0):
+        if(EEG_samples[trial_start_index,-1] != 0):
                             
             # Trim EEG samples up to the next-trial index and append zeros
-            EEG_samples[:][:] = np.concatenate((EEG_samples[trial_start_index:][:],np.zeros((trial_start_index,N_EEG_CHANNELS+1))));
+            EEG_samples[:,:] = np.concatenate((EEG_samples[trial_start_index:,:],np.zeros((trial_start_index,N_EEG_CHANNELS+1))));
             
             # Decrement the EEG sample index by the number of samples trimmed
             EEG_sample_index -= trial_start_index;
@@ -306,48 +322,7 @@ def Run(processor_outlet):
                
         # End of Construct_Epoch()
         pass;
-            
-    """
-    
-    Shutdown_Processor()
-    
-        This function prepares the processor module to safely return.
-    
-        arguments:
-            [none]
-        returns:
-            [none]
-        exceptions:
-            [none]
-    
-        --> Delete/destroy/close/disable relevant variable and objects
-        
-        --> Return
-        
-    """
-    def Shutdown_Processor():
-                
-        stimuli_inlet.close_stream();
-        EEG_inlet.close_stream();
-        processor_outlet.__del__();
-        print("[P300_Processor.py]:","Shutting down...");
-    
-    #############################
-    #   Initialize LSL inlets   #
-    #############################
-
-    # Grab an inlet to the BCI stream
-    print("[P300_Processor.py]:","Resolving P300_Stimuli stream...");
-    inlet_stream = resolve_stream("type", "P300_Stimuli");
-    stimuli_inlet = StreamInlet(inlet_stream[0]);
-    print("[P300_Processor.py]:","P300_Stimuli stream resolved.");
-    
-    # Grab an inlet to the EEG stream
-    print("[P300_Processor.py]:","Resolving Packaged_EEG stream...");
-    inlet_stream = resolve_stream("type", "Packaged_EEG");
-    EEG_inlet = StreamInlet(inlet_stream[0]);
-    print("[P300_Processor.py]:","Packaged_EEG stream resolved.");
-    
+                    
     ##########################
     #   Initialize Filters   #
     ##########################
@@ -454,7 +429,7 @@ def Run(processor_outlet):
     ##################################
     #   Synchronize start with BCI   #
     ##################################
-    
+        
     # Send restart request to BCI
     restart_signal = np.zeros(N_OUTPUTS).astype(int);
     restart_signal[-1] = N_OUTPUTS;
@@ -463,6 +438,7 @@ def Run(processor_outlet):
     ###########################
     #   Main Processor Loop   #
     ###########################
+    print("[P300_Processor.py]:","Processor running...");
     processor_running = True;
     while(processor_running):
         
@@ -511,8 +487,10 @@ def Run(processor_outlet):
             ###################################
     
             # Check if this epoch is the first trial of a new classification
+            if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
             
                 # Handle classification start
+                #Start_New_Classification();
                 #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                        
                 # Validate that a new char was expected
                 
@@ -525,7 +503,8 @@ def Run(processor_outlet):
                 
                     # Get updated threshold values 
                 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-                                   
+                pass;               
+                
             # Check if data being streamed is for the current classification
             #if(!waiting_start_new_classification):
                 
@@ -572,37 +551,80 @@ def Run(processor_outlet):
             #   Update variables for next epoch   #
             #######################################
        
-            # Increment next epoch index
+            # Increment the number of epochs received
+            total_epochs_received += 1;
+             
+            # Increment the next EEG epoch index
+            EEG_epoch_index += 1;
             
-            # Check if the epoch index needs to roll over
+            # Check if the next EEG epoch index needs to roll over
+            if(EEG_epoch_index >= EPOCHS_TO_HOLD):
                 
-                # Roll the epoch index over to the start    
+                # Roll the EEG epoch index back over to the start
+                EEG_epoch_index = 0;
                 
     
         pass;    
-        
-    Shutdown_Processor();    
-      
-    #TODO: remove this
-    """
-    # Simulate faux classifications
-    import time;
-        
-    # Simulate a tile magnification
-    time.sleep(10);
-    fake_classification = np.zeros(N_OUTPUTS).astype(int);
-    fake_classification[-1] = -2;
-    processor_outlet.push_sample(fake_classification);
+
+# Grab an inlet to the EEG stream
+print("[P300_Processor.py]:","Resolving Packaged_EEG stream...");
+inlet_stream = resolve_byprop("source_id", "Cyton_Data_Packager");
+EEG_inlet = StreamInlet(inlet_stream[-1]);
+print("[P300_Processor.py]:","Packaged_EEG stream resolved.");
+#TODO: make this less ghetto
+# Let the Cyton Data Packager know a consumer is connecting
+EEG_inlet.pull_chunk(0.0);
+time.sleep(5);
+# Discard the setup chunk
+EEG_inlet.pull_chunk(0.0);
+
+# Initialize the processor outlet
+print("[P300_Processor.py]:","Opening P300_Processor outlet...");
+info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "int16","P300_Processor");
+processor_outlet = StreamOutlet(info);
+print("[P300_Processor.py]:","P300_Processor outlet open.");
+
+# Grab an inlet to the BCI stream
+print("[P300_Processor.py]:","Resolving P300_Stimuli stream...");
+inlet_stream = resolve_byprop("source_id", "BCI_GUI");
+stimuli_inlet = StreamInlet(inlet_stream[-1]);
+print("[P300_Processor.py]:","P300_Stimuli stream resolved.");
+
+try:
     
-    # Simulate a right click
-    time.sleep(10);
-    fake_classification[-1] = -30;
-    processor_outlet.push_sample(fake_classification);
-    """
-
-
-
-
+    # Launch the processor
+    Run(processor_outlet, stimuli_inlet, EEG_inlet);
+    
+except KeyboardInterrupt:
+    
+    # Disconnect from inlets
+    EEG_inlet.close_stream();
+    stimuli_inlet.close_stream();
+    
+    # Close the outlet so that it is not discoverable
+    processor_outlet.__del__();
+    print("[P300_Processor]:","Processor outlet destroyed.");
+    
+    # Close the program
+    print("Killing kernel...");
+    time.sleep(1);
+    
+except Exception as e:
+    
+    # Disconnect from inlets
+    EEG_inlet.close_stream();
+    stimuli_inlet.close_stream();
+    
+    # Close the outlet so that it is not discoverable
+    processor_outlet.__del__();
+    print("[P300_Processor]:","Processor outlet destroyed.");
+    
+    # Close the program
+    print("Killing kernel...");
+    time.sleep(1);
+    
+    raise e;
+        
 #TODO: remove this
 """
 from pylsl import StreamInfo, StreamOutlet;

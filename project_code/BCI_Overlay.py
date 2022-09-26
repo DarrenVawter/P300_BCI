@@ -13,7 +13,7 @@ import pyautogui; # virtualize keyboard & mouse control
 from math import floor, ceil;
 
 # Internal Modules
-from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Interaction, Stimuli_Trial; # definitions for enumerated data types
+from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Interaction, Stimuli_Code; # definitions for enumerated data types
 
 #TODO: swap these out (later, because it will generate annoying warnings)
 #from BCI_Constants import *; # pull constants from header
@@ -22,7 +22,7 @@ from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CA
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
 ###########################################################
-def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
+def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     #TODO: remove this    
     # Track framerate/item performance
@@ -136,8 +136,8 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         returns:
             [tile_rect]: [int, int, int, int] --> the left, top, right, & bottom of the tile's rect
         exceptions:
-            TypeError: if tile_id is not an int
-            ValueError: if tile_id is not within the range [0, N_TILES) or if the tile_id is not from a magnification tile
+            [TypeError]: if tile_id is not an int
+            [ValueError]: if tile_id is not within the range [0, N_TILES) or if the tile_id is not from a magnification tile
             
     
         --> Convert overlay tile dimensions to screen dimensions
@@ -204,8 +204,8 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         returns:
             [none]
         exceptions:
-            TypeError: if click_type is not a string
-            ValueError: if click_type is not "left", "right", or "double"
+            [TypeError]: if click_type is not a string
+            [ValueError]: if click_type is not "left", "right", or "double"
             
     """
     def Handle_Click(click_type):
@@ -263,6 +263,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
 
         del screen_grabber;
         overlay_running = False;
+        print("[BCI_Overlay.py]:","Shutting down...");
         
         # End of Shutdown_Overlay()
         pass;
@@ -491,24 +492,57 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             stimuli_data[N_TILES:N_OUTPUTS] = -1;
             stimuli_data[current_flash_group] = 1;
             
-            #TODO: add synchronizer back in to determine if the trial was a sync trial
+            #TODO: add DRBG back in to determine if the trial was a sync trial
+            # For now, call any trial that flashes tile 0 a sync trial
+            BCI_sync_code = stimuli_data[0];
             
-            # Append the trial's code to the array            
+            # Append the trial's sync code to the array & update UM232R
+            
             # Check if the trial is the first trial of a new classification
             if(start_new_classification):
                 
-                # Trial is the start of a new classification but is a not a sync trial
-                stimuli_data[-1] = Stimuli_Trial.NON_SYNC_START;
-                
+                # Check if trial is a sync trial
+                if(BCI_sync_code):
+                    
+                    # Trial is the start of a new classification but is a not a sync trial
+                    stimuli_data[-1] = Stimuli_Code.SYNC_START;
+                    
+                    # Send the UM232R a sync pulse
+                    UM232R.Send_Sync();
+                    
+                # Else, trial is not a sync trial
+                else:
+                    
+                    # Trial is the start of a new classification but is a not a sync trial
+                    stimuli_data[-1] = Stimuli_Code.NON_SYNC_START;
+                    
+                    # Send the UM232R a non-sync pulse
+                    UM232R.Send_Non_Sync();
+                    
                 # Reset new classification flag
                 start_new_classification = False;
                 
             # Else, the trial is not the first trial of a new classification
             else:
                 
-                # Trial is not the start of a new classification and is a not a sync trial                
-                stimuli_data[-1] = Stimuli_Trial.NON_SYNC;
-            
+                # Check if trial is a sync trial
+                if(BCI_sync_code):
+                    
+                    # Trial is not the start of a new classification but is a sync trial                
+                    stimuli_data[-1] = Stimuli_Code.SYNC;
+                    
+                    # Send the UM232R a sync pulse
+                    UM232R.Send_Sync();
+                        
+                # Else, trial is not a sync trial
+                else:
+                    
+                    # Trial is not the start of a new classification and is a not a sync trial                
+                    stimuli_data[-1] = Stimuli_Code.NON_SYNC;
+                    
+                    # Send the UM232R a non-sync pulse
+                    UM232R.Send_Non_Sync();
+                    
             # Send the flash data to the processor
             stimuli_outlet.push_sample(stimuli_data);
            
@@ -610,7 +644,6 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                return (Program_Interaction.EXIT,None);
                
         #TODO: remove this   
-        """
         # calc & print framerate/item performance
         this_time = time.time();    
         frame_time += (this_time-last_time);
@@ -622,7 +655,6 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             print(b_sum/n_frames);
             print("~~~~~~~~~~~~~~~~");
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        """
         
         # End of Main overlay loop
         pass;
