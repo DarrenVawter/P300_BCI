@@ -66,6 +66,9 @@ N_KEYS = 7;
 ##########################
 #   BCI-wide Constants   #
 ##########################
+
+# Default call classification threshold
+DEFAULT_THRESHOLD = 0.95;
     
 # Caclulate number of outputs
 N_OUTPUTS = max(N_TILES,N_KEYS);
@@ -75,7 +78,6 @@ FLASH_DURATION = 0.1;
 
 # Group flash frequency in Hz
 FLASH_FREQUENCY = 1/FLASH_DURATION;
-
 
 
 

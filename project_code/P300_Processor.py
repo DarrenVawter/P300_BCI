@@ -25,7 +25,7 @@ from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # commu
 
 # Internal Modules
 from BCI_Enumerations import Stimuli_Code;
-from BCI_Constants import N_OUTPUTS, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
+from BCI_Constants import N_OUTPUTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
 
 #############################
 #   Processor Entry point   #
@@ -322,7 +322,121 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
                
         # End of Construct_Epoch()
         pass;
+
+    """
+    
+    Start_New_Classification()
+    
+        This function handles the re-initialization of the relevant
+        variables prior to beginning a new classification.
+        
+        arguments:
+            [none]
+        returns:
+            [none]
+        exceptions:
+            [RuntimeError] --> if this function was called when a new
+                               classification was not expected to begin
+               
+        --> Validate that a new char was expected
                     
+        --> Update flag to show that classification data has started streaming
+                    
+        --> Reset cell probabilities
+    
+        --> Check if using NLP
+                    
+            --> Get updated threshold values 
+            
+        --> Else, not using NLP
+        
+            --> Use default threshold values
+    
+    """                  
+    def Start_New_Classification():        
+             
+        nonlocal waiting_start_new_classification, cell_probabilities, cell_thresholds;
+        
+        # Validate that a new char was expected
+        if(not waiting_start_new_classification):
+            raise RuntimeError("Received new classification flag from the BCI stream when a new classification was not expected to begin.");
+                    
+        # Update flag to show that classification data has started streaming
+        waiting_start_new_classification = False;
+                    
+        # Reset cell probabilities
+        cell_probabilities = np.ones(N_OUTPUTS);
+        unused_cells = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == -1);
+        cell_probabilities[unused_cells] = 0;
+        cell_probabilities[:] = cell_probabilities[:]/np.sum(cell_probabilities);
+    
+        #TODO: do this dynamically once the keyboard is added in
+        using_NLP = False;
+    
+        # Check if using NLP
+        if(using_NLP):            
+        
+            #TODO: do this dynamically once the keyboard is added in
+            # Get updated threshold values 
+            pass;
+                
+        # Else, not using NLP
+        else:
+    
+            # Use default threshold values for used cells
+            cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_OUTPUTS);
+            
+            # Use >100% threshold value for unused cells
+            cell_thresholds[unused_cells] = 2;
+
+        # End of Start_New_Classification();
+        pass;
+        
+    # Calculate the correlation coefficients
+    def Calculate_Correlation_Coefficients(normalized_epoch):
+        
+        #//np.correlate(x,y,"full");
+        
+        return [1,2,3];
+    
+    # Calculate trial probability
+    def Calculate_Trial_Probability(correlation_coefficients):         
+        
+        # Generate an independent probability that this trial was a non-target trial
+        
+        # Generate an independent probability that this trial was a target trial
+        
+        # Normalize the generated probabilities
+        
+        return 0.5;
+    
+    # Update cell probabilities
+    def Update_Probabilities(trial_probability): 
+        
+        # Update the cell probabilities according to the probability of this trial
+        
+        # Weight previous probabilities
+        
+        pass;
+        
+    # Broadcast classification status
+    def Broadcast_Classification_Status():
+        
+        # Find what is currently the most probable cell
+        
+        # Check if the most probable cell is above its threshold
+        
+            # Broadcast the classification result
+            # (offset by 1 then multiply by -1 as per scheme)                
+            
+            # Flag that the processor is waiting for the BCI to start streaming current data
+        
+        # Else, a classification is not ready
+        
+            # Broadcast the current probabilities
+                
+        pass;
+        
     ##########################
     #   Initialize Filters   #
     ##########################
@@ -421,10 +535,11 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     target_cov = np.empty((CORRELATION_DEGREE,1));
     
     # Initialize cell probabilities
-    cell_probabilities = np.empty(N_OUTPUTS);
+    cell_probabilities = np.ones(N_OUTPUTS)/N_OUTPUTS;
     
     # Initialize threshold values
-    #TODO: this
+    #TODO: initialize dynamically
+    cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_OUTPUTS);
     
     ##################################
     #   Synchronize start with BCI   #
@@ -490,62 +605,27 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
             if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
             
                 # Handle classification start
-                #Start_New_Classification();
-                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                        
-                # Validate that a new char was expected
-                
-                # Update flag to show that classification data has started streaming
-                #waiting_start_new_classification = False;
-                
-                # Reset cell probabilities
-
-                # Check if using NLP
-                
-                    # Get updated threshold values 
-                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-                pass;               
+                Start_New_Classification();
                 
             # Check if data being streamed is for the current classification
-            #if(!waiting_start_new_classification):
+            if(not waiting_start_new_classification):
                 
-                # Normalize the epoch
+                # Normalize the epoch by channel
+                normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.sum(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
                 
                 # Calculate the correlation coefficients
-                #//np.correlate(x,y,"full");
+                correlation_coefficients = Calculate_Correlation_Coefficients(normalized_epoch); 
                 
-                # Calculate trial probabilities
-                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                    
-                # Generate an independent probability that this trial was a non-target trial
-                
-                # Generate an independent probability that this trial was a target trial
-                
-                # Normalize the generated probabilities
-                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+                # Calculate trial probability
+                trial_probability = Calculate_Trial_Probability(correlation_coefficients);
                 
                 # Update cell probabilities
-                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
-                # Update the cell probabilities according to the probability of this trial
-                
-                # Weight previous probabilities
-                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+                Update_Probabilities(trial_probability);
                 
                 #TODO: calculate the probability that the user was looking at the screen at all
                 
                 # Broadcast classification status
-                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
-                # Find what is currently the most probable cell
-                
-                # Check if the most probable cell is above its threshold
-                
-                    # Broadcast the classification result
-                    # (offset by 1 then multiply by -1 as per scheme)                
-                    
-                    # Flag that the processor is waiting for the BCI to start streaming current data
-                
-                # Else, a classification is not ready
-                
-                    # Broadcast the current probabilities
-                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+                Broadcast_Classification_Status();
                 
             #######################################
             #   Update variables for next epoch   #
