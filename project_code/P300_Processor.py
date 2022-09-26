@@ -93,11 +93,51 @@ def Run(processor_outlet):
         #   Check for new stimulus data   #
         ###################################
         
+        # Check if stimulus input was received
         
+            # Append the stimulus input to the stimulus data 
+        
+            # Increment the next stimulus index
+            
+            # Check if the stimulus index needs to roll over
+                
+                # Roll the stimulus index over to the start
+            
         ##############################
         #   Check for new EEG data   #
         ##############################
     
+        # Check if a new chunk of EEG data was received
+        
+            # Format the chunk appropriately
+            
+            # Filter the chunk
+            
+            # Grab the size of the chunk
+            
+            # Grab the indices of the first trial start, if any exist
+            
+            # Check if this chunk causes data overflow
+            
+                # Check if a trial is already ongoing
+                
+                    # Append the chunk to the EEG data
+                    
+                    # Update the next sample index
+                    
+                # Check if this chunk contains a trial start
+                
+                    # Add the trial-data portion of the chunk to the EEG data
+                    
+                    # Update the next sample index
+                
+                # Else, this chunk does not contain any trial information
+                
+                    # Throw away the chunk by doing nothing with it
+            
+            # Else, this chunk causes data overflow
+            
+                # Raise error
     
         ####################
         #   Handle Epoch   #
@@ -166,10 +206,12 @@ def Run(processor_outlet):
             #   Update variables for next epoch   #
             #######################################
        
-            # Increment current epoch index
+            # Increment next epoch index
             
-            # Check if the index needs to roll over
-    
+            # Check if the epoch index needs to roll over
+                
+                # Roll the epoch index over to the start    
+                
     
         pass;    
     
