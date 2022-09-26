@@ -73,7 +73,7 @@ def Run(processor_outlet):
             processor_running = False;
                     
         # Append the stimulus input to the stimulus data
-        stimuli_trial_data[stimuli_trial_index] = stimulus_input;
+        stimuli_trial_data[stimuli_trial_index][:] = stimulus_input[:];
         
         # Increment the next stimulus index
         stimuli_trial_index += 1;        
@@ -148,7 +148,7 @@ def Run(processor_outlet):
         chunk_size = len(EEG_chunk);
             
         # Grab the indices of the first trial start, if any exist
-        trial_start_index = np.argmax(EEG_chunk[:][-1]!=-1);
+        trial_start_index = np.argmax(EEG_chunk[:][-1]!=0);
                 
         # Check that this chunk does not cause data overflow
         if(EEG_sample_index+chunk_size <= MAX_SAMPLES_TO_HOLD):  
@@ -187,6 +187,126 @@ def Run(processor_outlet):
         # End of Handle_Incoming_EEG_Chunk()
         pass;
                 
+    """
+    
+    Synchronize_Streams()
+    
+        This function checks if the streams are already synchronized. If they
+        are not, it synchronizes them using DRBG resynchronization.
+    
+        arguments:
+            [none]
+        returns:
+            [none]
+        exceptions:
+            [none]
+    
+        --> Grab Cyton's sync code
+            
+        --> Grab BCI's sync code
+            
+        --> Check for desynchronization
+            
+            --> Resynchronize streams #this is a big fat TODO
+                
+    
+    """
+    def Synchronize_Streams():  
+               
+        # Grab Cyton's sync code
+        # (negative trial stamp indicates a sync trial)
+        Cyton_sync_code = (EEG_samples[1][-1] < 0);    
+        
+        # Grab BCI's sync flag
+        BCI_sync_code = stimuli_trial_data[stimuli_trial_index][-1];
+        
+        # >=0 --> training mode, check the cell code at that index
+        if(BCI_sync_code >= 0):
+            BCI_sync_code = stimuli_trial_data[EEG_epoch_index][BCI_sync_code];
+            
+        # -1 --> non-sync trial, same classification, classification mode
+        # -3 --> non-sync trial, new classification, classification mode
+        elif(BCI_sync_code == -1 or BCI_sync_code == -3):
+            BCI_sync_code = False;
+            
+        # -2 --> sync trial, same classification, classification mode
+        # -4 --> sync trial, new classification, classification mode
+        else:
+            BCI_sync_code = True;
+                    
+        # Check for desynchronization
+        if(Cyton_sync_code != BCI_sync_code):
+            
+            # Raise error
+            raise RuntimeError("Cyton/BCI desynchronization detected.");
+            #TODO: handle this by adding synchronizer back in
+            
+        # End of Synchronize_Streams()
+        pass;
+            
+    """
+    
+    Construct_Epoch()
+    
+        This function constructs an epoch using the first epoch's-worth of
+        samples from EEG_samples and the stimulus codes at epoch_index.
+    
+        arguments:
+            [none]
+        returns:
+            [none]
+        exceptions:
+            [none]
+               
+        --> Find the EEG sample index of the start of the next trial, if any
+            
+        --> Check if a next-trial index was found
+            
+            --> Set the next-trial index
+                
+            --> Trim EEG samples up to the next-trial index
+                
+            --> Update the EEG sample index according to the number of trials trimmed
+                
+        --> Else, no next-trial index was found
+            
+            --> Discard all EEG samples
+                
+            --> Reset EEG sample index to 0
+                
+    
+    """
+    def Construct_Epoch():   
+        
+        nonlocal EEG_epoch_data, EEG_samples, EEG_sample_index;
+        
+        # Create the epoch
+        EEG_epoch_data[EEG_epoch_index][:][:] = EEG_samples[:SAMPLES_PER_EPOCH][:N_EEG_CHANNELS];
+        
+        # Find the EEG sample index of the start of the next trial, if any
+        trial_start_index = np.argmax(EEG_samples[1:][-1]!=0);        
+            
+        # Check if a next-trial index was found
+        if(EEG_samples[trial_start_index][-1] != 0):
+                            
+            # Trim EEG samples up to the next-trial index and append zeros
+            EEG_samples[:][:] = np.concatenate((EEG_samples[trial_start_index:][:],np.zeros((trial_start_index,N_EEG_CHANNELS+1))));
+            
+            # Decrement the EEG sample index by the number of samples trimmed
+            EEG_sample_index -= trial_start_index;
+                
+        # Else, no next-trial index was found
+        else:
+            
+            # Discard EEG samples
+            EEG_samples = np.zeros((MAX_SAMPLES_TO_HOLD,N_EEG_CHANNELS+1));
+                
+            # Reset EEG sample index to 0
+            EEG_sample_index = 0;
+               
+        # End of Construct_Epoch()
+        pass;
+            
     """
     
     Shutdown_Processor()
@@ -294,6 +414,7 @@ def Run(processor_outlet):
     # (in order to compare with the total number of trials received from the BCI)
     total_epochs_received = 0;
     #TODO: trim this in accordance with total_trials_received to prevent them from becoming annoyingly large
+    #TODO: detect large gaps between this and total_trials_received (to allow one to catch up)
     
     ####################################
     #   Initialize stimuli variables   #
@@ -309,6 +430,7 @@ def Run(processor_outlet):
     # (in order to compare with the total number of epochs received from the Cyton)
     total_trials_received = 0;
     #TODO: trim this in accordance with total_epochs_received to prevent them from becoming annoyingly large
+    #TODO: detect large gaps between this and total_epochs_received (to allow one to catch up)
     
     
     ########################################
@@ -372,37 +494,11 @@ def Run(processor_outlet):
         
         # Check if there are enough EEG samples to construct a complete epoch
         # and that the corresponding stimulus data has already been collected
+        if(EEG_sample_index > SAMPLES_PER_EPOCH and total_trials_received > total_epochs_received):
     
-            # Synchronize the epoch (wrap this probably)
-            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
-            # Grab Cyton's sync code
+            Synchronize_Streams();
             
-            # Grab BCI's sync code
-            
-            # Check for desynchronization
-            
-                # Raise error
-                #TODO: handle this by adding synchronizer back in
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
-                        
-            # Construct the epoch (wrap this probably)
-            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
-            # Find the EEG sample index of the start of the next trial, if any
-            
-            # Check if a next-trial index was found
-            
-                # Set the next-trial index
-                
-                # Trim EEG samples up to the next-trial index
-                
-                # Update the EEG sample index according to the number of trials trimmed
-                
-            # Else, no next-trial index was found
-            
-                # Discard EEG samples
-                
-                # Reset EEG sample index
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+            Construct_Epoch();
     
             #############################
             #   Handle Training Epoch   #
