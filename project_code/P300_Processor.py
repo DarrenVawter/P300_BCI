@@ -103,7 +103,7 @@ def Run(processor_outlet):
         returns:
             [none]
         exceptions:
-            [none]
+            [MemoryError]: if the chunk causes the EEG_samples matrix to overflow
     
         --> Format the chunk appropriately
             
@@ -139,36 +139,50 @@ def Run(processor_outlet):
     """
     def Handle_Incoming_EEG_Chunk(EEG_chunk):
         
-        # Format the chunk appropriately
-        print(np.shape(EEG_chunk));
-            
+        nonlocal EEG_samples, EEG_sample_index;
+        
         # Filter the chunk
+        #TODO: this
             
         # Grab the size of the chunk
+        chunk_size = len(EEG_chunk);
             
         # Grab the indices of the first trial start, if any exist
-            
-        # Check if this chunk causes data overflow
-            
+        trial_start_index = np.argmax(EEG_chunk[:][-1]!=-1);
+                
+        # Check that this chunk does not cause data overflow
+        if(EEG_sample_index+chunk_size <= MAX_SAMPLES_TO_HOLD):  
+        
             # Check if a trial is already ongoing
+            if(EEG_sample_index > 0):
                 
-            # Append the chunk to the EEG data
+                # Append the chunk to the EEG data
+                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size][:] = EEG_chunk[:][:];
+                
+                # Update the next EEG sample index
+                EEG_sample_index += chunk_size;
                     
-            # Update the next EEG sample index
+            # Check if this chunk contains a trial start
+            elif(EEG_chunk[trial_start_index][-1] != 0):
                     
-        # Check if this chunk contains a trial start
+                # Add the trial-data portion of the chunk to the EEG data
+                EEG_samples[EEG_sample_index:EEG_sample_index+chunk_size-trial_start_index][:] = EEG_chunk[trial_start_index:][:];                        
                 
-            # Add the trial-data portion of the chunk to the EEG data
+                # Update the next EEG sample index
+                EEG_sample_index += chunk_size - trial_start_index;
                     
-            # Update the next EEG sample index
+            # Else, this chunk does not contain any trial information
+            else:
                 
-        # Else, this chunk does not contain any trial information
-                
-            # Throw away the chunk by doing nothing with it
+                # Throw away the chunk by doing nothing with it
+                print("discarding chunk...");
+                pass;
             
         # Else, this chunk causes data overflow
+        else:
             
             # Raise error
+            raise MemoryError("Ran out of pre-allocated RAM to store EEG samples.");
         
         # End of Handle_Incoming_EEG_Chunk()
         pass;
@@ -203,17 +217,16 @@ def Run(processor_outlet):
     #############################
 
     # Grab an inlet to the BCI stream
-    print("[P300_Processor.py]:","Resolving P300_Stimuli inlet...");
+    print("[P300_Processor.py]:","Resolving P300_Stimuli stream...");
     inlet_stream = resolve_stream("type", "P300_Stimuli");
     stimuli_inlet = StreamInlet(inlet_stream[0]);
+    print("[P300_Processor.py]:","P300_Stimuli stream resolved.");
     
     # Grab an inlet to the EEG stream
-    print("[P300_Processor.py]:","Resolving Packaged_EEG inlet...");
+    print("[P300_Processor.py]:","Resolving Packaged_EEG stream...");
     inlet_stream = resolve_stream("type", "Packaged_EEG");
     EEG_inlet = StreamInlet(inlet_stream[0]);
-    
-    # Celebrate
-    print("[P300_Processor.py]:","Resolved! :D");
+    print("[P300_Processor.py]:","Packaged_EEG stream resolved.");
     
     ##########################
     #   Initialize Filters   #
@@ -267,15 +280,15 @@ def Run(processor_outlet):
     # Initialize EEG sample matrix
     EEG_samples = np.zeros((MAX_SAMPLES_TO_HOLD,N_EEG_CHANNELS+1));
     
-    # Initialize current EEG sample index to 1
-    EEG_sample_index = 1;
+    # Initialize current EEG sample index to 0
+    EEG_sample_index = 0;
     
     # Initialize EEG epoch data (EEG samples neatly formatted into epochs)
     # (This technically contains repeated data, but it's programmatically convenient)
     EEG_epoch_data = np.zeros((EPOCHS_TO_HOLD, SAMPLES_PER_EPOCH, N_EEG_CHANNELS));
     
-    # Initialize current EEG epoch index to 1
-    EEG_epoch_index = 1;
+    # Initialize current EEG epoch index to 0
+    EEG_epoch_index = 0;
     
     # Count the total number of epochs received from the Cyton
     # (in order to compare with the total number of trials received from the BCI)
@@ -289,8 +302,8 @@ def Run(processor_outlet):
     # Initialize the stimuli trial matrix
     stimuli_trial_data = np.zeros((STIMULI_TO_HOLD, N_OUTPUTS+1));
     
-    # Initialize the stimuli trial index to 1
-    stimuli_trial_index = 1;
+    # Initialize the stimuli trial index to 0
+    stimuli_trial_index = 0;
     
     # Count the total number of trials received from the BCI
     # (in order to compare with the total number of epochs received from the Cyton)
@@ -325,15 +338,15 @@ def Run(processor_outlet):
     restart_signal[-1] = N_OUTPUTS;
     processor_outlet.push_sample(restart_signal);
     
-    #########################
-    #   Main Overlay Loop   #
-    #########################
+    ###########################
+    #   Main Processor Loop   #
+    ###########################
     processor_running = True;
     while(processor_running):
         
-        ###################################
-        #   Check for new stimulus data   #
-        ###################################
+        #############################
+        #   Handle stimuli stream   #
+        #############################
         
         # Check if stimulus input was received
         stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
@@ -342,16 +355,16 @@ def Run(processor_outlet):
             # Appropriately handle the stimulus input
             Handle_Incoming_Stimulus(stimulus_input);
             
-        ##############################
-        #   Check for new EEG data   #
-        ##############################
+        #########################
+        #   Handle EEG stream   #
+        #########################
     
         # Check if a new chunk of EEG data was received
         EEG_chunk, _ = EEG_inlet.pull_chunk(0.0);
         if(len(EEG_chunk)>0):
             
             # Appropriately handle the chunk
-            Handle_Incoming_EEG_Chunk(EEG_chunk);
+            Handle_Incoming_EEG_Chunk(np.array(EEG_chunk));
     
         ####################
         #   Handle Epoch   #

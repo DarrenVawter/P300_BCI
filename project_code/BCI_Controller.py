@@ -14,6 +14,7 @@ pygame objects necessary to display the screen or play sounds.
 ###############################
 
 # External Modules
+import time; # sleep
 import numpy as np; # fast arrays&manipulation
 import threading; # run processor in a separate thread 
 import pygame; # display to the screen and play sounds
@@ -21,13 +22,11 @@ import pyautogui; # virtual monitor/mouse/keyboard
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_stream; # communicating with P300 Processor
 
 # Internal Modules
-from BCI_Enumerations import BCI_Mode, BCI_Interaction, Program_Interaction; # definitions for enumerated data types
+from BCI_Enumerations import BCI_Mode, Program_Interaction; # definitions for enumerated data types
 from BCI_Constants import N_OUTPUTS; # pull constants from header
 import BCI_Overlay; # run screen overlay using P300 speller
 import BCI_Keyboard; # run keyboard using P300 speller 
 import P300_Processor; # run the P300 data processor
-
-print("~")
 
 ###################################
 #   Define Controller Constants   #
@@ -63,17 +62,19 @@ pygame.display.set_caption("P300 BCI");
 # Initialize the pygame audio mixer
 pygame.mixer.init();
 
-print("A")
-
 # Initialize the stimuli outlet
+print("[BCI_Controller.py]:","Opening P300_Stimuli outlet...");
 info = StreamInfo("P300_Stimuli", "P300_Stimuli", N_OUTPUTS+1, 125, "int16","BCI_GUI");
 stimuli_outlet = StreamOutlet(info);
+time.sleep(.1);
+print("[BCI_Controller.py]:","P300_Stimuli outlet open.");
 
 # Initialize the processor outlet
+print("[BCI_Controller.py]:","Opening P300_Processor outlet...");
 info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "int16","P300_Processor");
 processor_outlet = StreamOutlet(info);
-
-print("B")
+time.sleep(.1);
+print("[BCI_Controller.py]:","P300_Processor outlet open.");
 
 #############################
 #   Launch P300 processor   #
@@ -84,18 +85,23 @@ print("[BCI_Controller.py]:","Launching P300_Processor.py...");
 processor_thread = threading.Thread(target=P300_Processor.Run, args=(processor_outlet,));
 processor_thread.daemon = True;    
 processor_thread.start();
+time.sleep(.1);
+print("[BCI_Controller.py]:","P300_Processor.py launched.");
 
 # Wait for the processor to broadcast its stream and open an inlet to it
 print("[BCI_Controller.py]:","Resolving P300_Processor stream...");
 inlet_stream = resolve_stream('type', 'P300_Processor');
 processor_inlet = StreamInlet(inlet_stream[0]);
+print("[BCI_Controller.py]:","P300_Processor stream resolved.");
 
 ##################################
 #   Launch Cyton Data Packager   #
 ##################################
 
-    #TODO: add this in when packaging the complete solution
-    #print("[BCI_Controller.py]:","Launching Cyton_Data_Packager.py...");
+#print("[BCI_Controller.py]:","Launching Cyton_Data_Packager.py...");
+#TODO: add this in when packaging the complete solution
+#time.sleep(.1);
+#print("[BCI_Controller.py]:","Cyton_Data_Packager.py launched.");
 
 ############################
 #   Main Controller Loop   #
