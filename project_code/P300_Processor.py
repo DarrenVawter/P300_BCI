@@ -41,7 +41,7 @@ def Run(processor_outlet):
     #   Initialize Filters   #
     ##########################
     
-    # Filter out US main line noise
+    # Filter out US main line noise (and first resonant echo)
     # Create a 60Hz notch filter with -3dB attenuation @ +-1Hz
     # Create a 120Hz notch filter with -3dB attenuation @ +-1Hz
     
@@ -62,7 +62,7 @@ def Run(processor_outlet):
     ######################################
     
     # Track whether the processor is waiting for the first trial of the new classification
-    waiting_start_new_classification = True; #TODO: init T or F?
+    waiting_start_new_classification = True;
     
     # Declare the correlation statistics
     non_target_means = np.empty((CORRELATION_DEGREE,1));
@@ -77,6 +77,10 @@ def Run(processor_outlet):
     
     # Initialize threshold values
     #TODO: this
+    
+    ##################################
+    #   Synchronize start with BCI   #
+    ##################################
     
     # Send restart request to BCI
     restart_signal = np.zeros(N_OUTPUTS);
@@ -95,13 +99,16 @@ def Run(processor_outlet):
         
         # Check if stimulus input was received
         
+            # handle incoming stimulus codes
+            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
             # Append the stimulus input to the stimulus data 
         
             # Increment the next stimulus index
             
             # Check if the stimulus index needs to roll over
                 
-                # Roll the stimulus index over to the start
+                # Roll the stimulus index over to the start                
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
             
         ##############################
         #   Check for new EEG data   #
@@ -109,6 +116,8 @@ def Run(processor_outlet):
     
         # Check if a new chunk of EEG data was received
         
+            # Handle incoming eeg chunk
+            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~        
             # Format the chunk appropriately
             
             # Filter the chunk
@@ -123,13 +132,13 @@ def Run(processor_outlet):
                 
                     # Append the chunk to the EEG data
                     
-                    # Update the next sample index
+                    # Update the next EEG sample index
                     
                 # Check if this chunk contains a trial start
                 
                     # Add the trial-data portion of the chunk to the EEG data
                     
-                    # Update the next sample index
+                    # Update the next EEG sample index
                 
                 # Else, this chunk does not contain any trial information
                 
@@ -138,6 +147,7 @@ def Run(processor_outlet):
             # Else, this chunk causes data overflow
             
                 # Raise error
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
     
         ####################
         #   Handle Epoch   #
@@ -146,30 +156,62 @@ def Run(processor_outlet):
         # Check if there are enough EEG samples to construct a complete epoch
         # and that the corresponding stimulus data has already been collected
     
+            # Synchronize the epoch (wrap this probably)
+            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
+            # Grab Cyton's sync code
+            
+            # Grab BCI's sync code
+            
+            # Check for desynchronization
+            
+                # Raise error
+                #TODO: handle this by adding synchronizer back in
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+                        
+            # Construct the epoch (wrap this probably)
+            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
+            # Find the EEG sample index of the start of the next trial, if any
+            
+            # Check if a next-trial index was found
+            
+                # Set the next-trial index
+                
+                # Trim EEG samples up to the next-trial index
+                
+                # Update the EEG sample index according to the number of trials trimmed
+                
+            # Else, no next-trial index was found
+            
+                # Discard EEG samples
+                
+                # Reset EEG sample index
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+    
             #############################
             #   Handle Training Epoch   #
             #############################
             
+            #TODO: this
             
             ###################################
             #   Handle Classification Epoch   #
             ###################################
     
-            # Check if this epoch is the trial of a new classification
+            # Check if this epoch is the first trial of a new classification
             
+                # Handle classification start
+                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                        
                 # Validate that a new char was expected
                 
                 # Update flag to show that classification data has started streaming
                 #waiting_start_new_classification = False;
                 
                 # Reset cell probabilities
-                #TODO: this
 
                 # Check if using NLP
-                #TODO: this
                 
                     # Get updated threshold values 
-                    #TODO: this
+                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
                                    
             # Check if data being streamed is for the current classification
             #if(!waiting_start_new_classification):
@@ -177,30 +219,41 @@ def Run(processor_outlet):
                 # Normalize the epoch
                 
                 # Calculate the correlation coefficients
-                #np.correlate(x,y,"full");
+                #//np.correlate(x,y,"full");
                 
-                # Generate a relative probability that this trial was a non-target trial
+                # Calculate trial probabilities
+                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                    
+                # Generate an independent probability that this trial was a non-target trial
                 
-                # Generate a relative probability that this trial was a target trial
+                # Generate an independent probability that this trial was a target trial
                 
-                # Normalize the gnerated probabilities
+                # Normalize the generated probabilities
+                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
                 
+                # Update cell probabilities
+                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
                 # Update the cell probabilities according to the probability of this trial
                 
                 # Weight previous probabilities
+                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
                 
+                #TODO: calculate the probability that the user was looking at the screen at all
+                
+                # Broadcast classification status
+                #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
                 # Find what is currently the most probable cell
                 
                 # Check if the most probable cell is above its threshold
                 
-                    # Broadcast the classification
+                    # Broadcast the classification result
                     # (offset by 1 then multiply by -1 as per scheme)                
                     
                     # Flag that the processor is waiting for the BCI to start streaming current data
                 
                 # Else, a classification is not ready
                 
-                    # Send the BCI updated probabilities
+                    # Broadcast the current probabilities
+                #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
                 
             #######################################
             #   Update variables for next epoch   #
@@ -215,8 +268,9 @@ def Run(processor_outlet):
     
         pass;    
     
-        
-    
+      
+    #TODO: remove this
+    """
     # Simulate faux classifications
     import time;
         
@@ -230,6 +284,7 @@ def Run(processor_outlet):
     time.sleep(10);
     fake_classification[-1] = -30;
     processor_outlet.push_sample(fake_classification);
+    """
 
 
 
