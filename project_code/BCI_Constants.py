@@ -19,11 +19,15 @@ GREEN = (0, 0, 255);
 #   SYSTEM CONSTANTS   #
 ########################
 
-# Monitor dimensions
+# Monitor parameters
 from pyautogui import size;
 SCREEN_WIDTH, SCREEN_HEIGHT = size();
 SCREEN_DIMENSIONS = [SCREEN_WIDTH, SCREEN_HEIGHT];
 
+# EEG parameters
+N_EEG_CHANNELS = 8;
+SAMPLING_FREQUENCY = 250;
+    
 ########################
 #   Pygame Constants   #
 ########################
@@ -65,6 +69,12 @@ N_KEYS = 7;
     
 # Caclulate number of outputs
 N_OUTPUTS = max(N_TILES,N_KEYS);
+
+# Amount of time, in seconds, to flash each group for
+FLASH_DURATION = 0.1;
+
+# Group flash frequency in Hz
+FLASH_FREQUENCY = 1/FLASH_DURATION;
 
 
 

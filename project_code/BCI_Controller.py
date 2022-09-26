@@ -14,6 +14,7 @@ pygame objects necessary to display the screen or play sounds.
 ###############################
 
 # External Modules
+import numpy as np; # fast arrays&manipulation
 import threading; # run processor in a separate thread 
 import pygame; # display to the screen and play sounds
 import pyautogui; # virtual monitor/mouse/keyboard
@@ -21,14 +22,16 @@ from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_stream; # commu
 
 # Internal Modules
 from BCI_Enumerations import BCI_Mode, BCI_Interaction, Program_Interaction; # definitions for enumerated data types
-from BCI_Constants import N_TILES, N_KEYS; # pull constants from header
+from BCI_Constants import N_OUTPUTS; # pull constants from header
 import BCI_Overlay; # run screen overlay using P300 speller
 import BCI_Keyboard; # run keyboard using P300 speller 
 import P300_Processor; # run the P300 data processor
 
-#######################################
-#   Initialize Controller Constants   #
-#######################################
+print("~")
+
+###################################
+#   Define Controller Constants   #
+###################################
     
 # Grab the monitor dimensions
 SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size();
@@ -60,30 +63,44 @@ pygame.display.set_caption("P300 BCI");
 # Initialize the pygame audio mixer
 pygame.mixer.init();
 
+print("A")
+
 # Initialize the stimuli outlet
-info = StreamInfo("P300_Stimuli", "P300_Stimuli", max(N_TILES,N_KEYS)+1, 125, "int16","BCI_GUI");
+info = StreamInfo("P300_Stimuli", "P300_Stimuli", N_OUTPUTS+1, 125, "int16","BCI_GUI");
 stimuli_outlet = StreamOutlet(info);
 
 # Initialize the processor outlet
-info = StreamInfo("P300_Processor", "P300_Processor", max(N_TILES,N_KEYS), 125, "int16","P300_Processor");
+info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "int16","P300_Processor");
 processor_outlet = StreamOutlet(info);
+
+print("B")
 
 #############################
 #   Launch P300 processor   #
 #############################
 
 # Run the P300 processor in a new stream
+print("[BCI_Controller.py]:","Launching P300_Processor.py...");
 processor_thread = threading.Thread(target=P300_Processor.Run, args=(processor_outlet,));
 processor_thread.daemon = True;    
 processor_thread.start();
 
-# Wait for the processor to broadcast its stream
+# Wait for the processor to broadcast its stream and open an inlet to it
+print("[BCI_Controller.py]:","Resolving P300_Processor stream...");
 inlet_stream = resolve_stream('type', 'P300_Processor');
 processor_inlet = StreamInlet(inlet_stream[0]);
+
+##################################
+#   Launch Cyton Data Packager   #
+##################################
+
+    #TODO: add this in when packaging the complete solution
+    #print("[BCI_Controller.py]:","Launching Cyton_Data_Packager.py...");
 
 ############################
 #   Main Controller Loop   #
 ############################
+print("[BCI_Controller.py]:","BCI initialized. Running...");
 BCI_running = True;
 while(BCI_running):
     
@@ -109,6 +126,10 @@ while(BCI_running):
     
     # Check if the program was closed through the BCI controls
     if(program_interaction == Program_Interaction.EXIT):
+       #TODO: wrap this
+       processor_inlet.close_stream();
+       stimuli_outlet.push_sample(-N_OUTPUTS*np.ones(N_OUTPUTS+1).astype(int));
+       stimuli_outlet.__del__();
        pygame.quit();
        BCI_running = False;
        break;
@@ -120,7 +141,9 @@ while(BCI_running):
     # Check if the program was closed through physical controls
     for event in pygame.event.get():
        if(event.type == pygame.QUIT):
-           processor_outlet.__del__();
+           #TODO: wrap this
+           processor_inlet.close_stream();
+           stimuli_outlet.push_sample(-N_OUTPUTS*np.ones(N_OUTPUTS+1).astype(int));
            stimuli_outlet.__del__();
            pygame.quit();
            BCI_running = False;

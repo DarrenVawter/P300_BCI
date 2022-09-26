@@ -7,17 +7,17 @@ This module displays a screen overlay running a P300 speller to the user.
 
 # External Modules
 import numpy as np; # fast arrays&manipulation
-import math; # floor
 import pygame; # display to the screen and play sounds
 import d3dshot; # grab screen pixels
-import pyautogui;
+import pyautogui; # virtualize keyboard & mouse control
+from math import floor, ceil;
 
 # Internal Modules
 from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Interaction, Stimuli_Trial; # definitions for enumerated data types
 
 #TODO: swap these out (later, because it will generate annoying warnings)
 #from BCI_Constants import *; # pull constants from header
-from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, N_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
+from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
@@ -169,7 +169,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         col = tile_id % N_TILE_COLUMNS;
         
         # Calc the tile's row
-        row = math.floor(tile_id / N_TILE_COLUMNS);
+        row = floor(tile_id / N_TILE_COLUMNS);
             
         # Verify that the tile id represents a magnification tile
         if(col == N_TILE_COLUMNS-1 or row == N_TILE_ROWS-1):
@@ -180,12 +180,12 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         tile_screen_height_conversion = (magnification_rect[3]-magnification_rect[1])/(N_TILE_ROWS-1);
         
         # Calculate tile's left/right relative to the screen using the overlay's magnification rect
-        left = math.floor(magnification_rect[0] + col * tile_screen_width_conversion);
-        right = math.ceil(left + tile_screen_width_conversion);
+        left = floor(magnification_rect[0] + col * tile_screen_width_conversion);
+        right = ceil(left + tile_screen_width_conversion);
         
         # Calculate tile's top/bottom relative to the screen using the overlay's magnification rect
-        top = math.floor(magnification_rect[1] + row * tile_screen_height_conversion);
-        bottom = math.ceil(top + tile_screen_height_conversion);
+        top = floor(magnification_rect[1] + row * tile_screen_height_conversion);
+        bottom = ceil(top + tile_screen_height_conversion);
                     
         # Return the rect
         return [left, top, right, bottom];
@@ -271,10 +271,12 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     #   Functional entry point   #
     ##############################
     
-    ####################################
-    #   Initialize overlay constants   #
-    ####################################
-            
+    ################################
+    #   Define overlay constants   #
+    ################################            
+        
+    # Number of flash images to pull from
+    N_FLASH_IMAGES = 10;
     
     # Calculate the dimensions of the overlay portion of the screen
     OVERLAY_WIDTH = round(SCREEN_WIDTH*(1-1/N_TILE_COLUMNS));
@@ -290,13 +292,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Number of tiles in the overlay interface
     N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
-        
-    # Amount of time, in seconds, to flash each group for
-    FLASH_DURATION = 0.1;
-    
-    # Number of flash images to pull from
-    N_FLASH_IMAGES = 10;
-    
+            
     # Load and scale flash images
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
     for i in range(N_FLASH_IMAGES):
@@ -385,7 +381,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     raise TypeError("Received non-integer classification ID from processor.");
                                     
                 # Check if classified tile is an overlay control option
-                if(math.floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
+                if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
                     # Convert control to overlay interaction
                     overlay_interaction = Overlay_Interaction(classification_id%N_TILE_COLUMNS);
@@ -401,7 +397,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
 
                     # Convert control to BCI interaction
-                    BCI_interaction = BCI_Interaction(math.floor(classification_id/N_TILE_COLUMNS));
+                    BCI_interaction = BCI_Interaction(floor(classification_id/N_TILE_COLUMNS));
                     
                     # Check if the user left clicked
                     if(BCI_interaction == BCI_Interaction.CLICK):
@@ -465,6 +461,15 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Flag to start a new classification
                 start_new_classification = True;
                 
+            # Check if input is a restart request
+            elif(processor_flag == N_OUTPUTS):
+                
+                # Reset tile probabilities
+                tile_probabilities = np.ones((N_TILES,1))/N_TILES;
+                
+                # Flag to start a new classification
+                start_new_classification = True;
+                
             # Else, input is updated probabilities
             else:
             
@@ -481,11 +486,12 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Pick the next flash group
             Choose_Flash_Tiles();
                         
-            # Convert flash data to 1 hot array
+            # Convert flash data to 1 hot array with -1 for unused cells
             stimuli_data = np.zeros(N_OUTPUTS+1).astype(int);
+            stimuli_data[N_TILES:N_OUTPUTS] = -1;
             stimuli_data[current_flash_group] = 1;
             
-            #TODO: add synchronizer back in to determine if the trial is a sync trial
+            #TODO: add synchronizer back in to determine if the trial was a sync trial
             
             # Append the trial's code to the array            
             # Check if the trial is the first trial of a new classification
@@ -569,7 +575,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         for i in range(N_TILES_PER_FLASH):
             
             # Get the tile's row
-            row = math.floor(current_flash_group[i] / N_TILE_COLUMNS);
+            row = floor(current_flash_group[i] / N_TILE_COLUMNS);
             
             # Get the tile's column
             col = current_flash_group[i] % N_TILE_COLUMNS;
@@ -604,6 +610,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                return (Program_Interaction.EXIT,None);
                
         #TODO: remove this   
+        """
         # calc & print framerate/item performance
         this_time = time.time();    
         frame_time += (this_time-last_time);
@@ -615,6 +622,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             print(b_sum/n_frames);
             print("~~~~~~~~~~~~~~~~");
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        """
         
         # End of Main overlay loop
         pass;

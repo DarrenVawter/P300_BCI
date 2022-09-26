@@ -19,23 +19,201 @@
 # External Modules
 import numpy as np;
 from pylsl import StreamInlet, resolve_stream; # communicating with BCI
+from math import ceil;
 
 # Internal Modules
-from BCI_Constants import N_OUTPUTS;
+from BCI_Constants import N_OUTPUTS, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
 
 #############################
 #   Processor Entry point   #
 #############################
 def Run(processor_outlet):
+        
+    ###############################
+    #   Define Helper Functions   #
+    ###############################
     
-    #####################################
-    #   Initialize LSL inlet from BCI   #
-    #####################################
+    """
+    
+    Handle_Incoming_Stimulus()
+    
+        This function properly adds the most recent stimulus trial codes from
+        the stimuli inlet to the stimuli_trial_data matrix.
+    
+        arguments:
+            [stimulus_input]: Most recent input from the stimuli_inlet 
+        returns:
+            [none]
+        exceptions:
+            [none]
+    
+        --> Check if stimulus_input is the shutdown signal
+                
+            --> Flag for shutdown
+            
+        --> Append the stimulus input to the stimulus data
+        
+        --> Increment the next stimulus index
+                
+        --> Check if the stimulus index needs to roll over
+                    
+            --> Roll the stimulus index over to the start  
+
+        --> Increment the count of trials received  
+        
+    """
+    def Handle_Incoming_Stimulus(stimulus_input):
+                 
+        nonlocal processor_running, stimuli_trial_data, stimuli_trial_index, total_trials_received;
+        
+        # Check if stimulus_input is the shutdown signal
+        if(np.sum(stimulus_input) == -N_OUTPUTS*(N_OUTPUTS+1)):
+            
+            # Flag for shutdown
+            processor_running = False;
+                    
+        # Append the stimulus input to the stimulus data
+        stimuli_trial_data[stimuli_trial_index] = stimulus_input;
+        
+        # Increment the next stimulus index
+        stimuli_trial_index += 1;        
+        
+        # Check if the stimulus index needs to roll over
+        if(stimuli_trial_index > STIMULI_TO_HOLD):
+            
+            # Roll the stimulus index over to the start  
+            stimuli_trial_index = 1;
+
+        # Increment the count of trials received    
+        total_trials_received += 1;       
+           
+        # End of Handle_Incoming_Stimulus()
+        pass;
+        
+        
+    """
+    
+    Handle_Incoming_Stimulus()
+    
+        This function properly trims and adds the most recent chunk of EEG
+        samples from the EEG inlet to the EEG_samples matrix.
+    
+        arguments:
+            [EEG_chunk]: Most recent chunk from the EEG_inlet 
+        returns:
+            [none]
+        exceptions:
+            [none]
+    
+        --> Format the chunk appropriately
+            
+        --> Filter the chunk
+            
+        --> Grab the size of the chunk
+            
+        --> Grab the indices of the first trial start, if any exist
+            
+        --> Check if this chunk causes data overflow
+            
+            --> Check if a trial is already ongoing
+                
+            --> Append the chunk to the EEG data
+                    
+            --> Update the next EEG sample index
+                    
+        --> Check if this chunk contains a trial start
+                
+            --> Add the trial-data portion of the chunk to the EEG data
+                    
+            --> Update the next EEG sample index
+                
+        --> Else, this chunk does not contain any trial information
+                
+            --> Throw away the chunk by doing nothing with it
+            
+        --> Else, this chunk causes data overflow
+            
+            --> Raise error
+        
+        
+    """
+    def Handle_Incoming_EEG_Chunk(EEG_chunk):
+        
+        # Format the chunk appropriately
+        print(np.shape(EEG_chunk));
+            
+        # Filter the chunk
+            
+        # Grab the size of the chunk
+            
+        # Grab the indices of the first trial start, if any exist
+            
+        # Check if this chunk causes data overflow
+            
+            # Check if a trial is already ongoing
+                
+            # Append the chunk to the EEG data
+                    
+            # Update the next EEG sample index
+                    
+        # Check if this chunk contains a trial start
+                
+            # Add the trial-data portion of the chunk to the EEG data
+                    
+            # Update the next EEG sample index
+                
+        # Else, this chunk does not contain any trial information
+                
+            # Throw away the chunk by doing nothing with it
+            
+        # Else, this chunk causes data overflow
+            
+            # Raise error
+        
+        # End of Handle_Incoming_EEG_Chunk()
+        pass;
+                
+    """
+    
+    Shutdown_Processor()
+    
+        This function prepares the processor module to safely return.
+    
+        arguments:
+            [none]
+        returns:
+            [none]
+        exceptions:
+            [none]
+    
+        --> Delete/destroy/close/disable relevant variable and objects
+        
+        --> Return
+        
+    """
+    def Shutdown_Processor():
+                
+        stimuli_inlet.close_stream();
+        EEG_inlet.close_stream();
+        processor_outlet.__del__();
+        print("[P300_Processor.py]:","Shutting down...");
+    
+    #############################
+    #   Initialize LSL inlets   #
+    #############################
 
     # Grab an inlet to the BCI stream
-    print("[P300_Processor.py]: Resolving P300_Stimuli inlet...")
-    inlet_stream = resolve_stream('type', 'P300_Stimuli');
-    stimulus_inlet = StreamInlet(inlet_stream[0]);
+    print("[P300_Processor.py]:","Resolving P300_Stimuli inlet...");
+    inlet_stream = resolve_stream("type", "P300_Stimuli");
+    stimuli_inlet = StreamInlet(inlet_stream[0]);
+    
+    # Grab an inlet to the EEG stream
+    print("[P300_Processor.py]:","Resolving Packaged_EEG inlet...");
+    inlet_stream = resolve_stream("type", "Packaged_EEG");
+    EEG_inlet = StreamInlet(inlet_stream[0]);
+    
+    # Celebrate
+    print("[P300_Processor.py]:","Resolved! :D");
     
     ##########################
     #   Initialize Filters   #
@@ -57,6 +235,24 @@ def Run(processor_outlet):
     # Define the degree of iterative correlation to perform
     CORRELATION_DEGREE = 3;
     
+    # Define the maximum amount of parsed data, in seconds, to hold in RAM
+    HOLDING_TIME = 120;
+    
+    # Define the time, in seconds, per epoch
+    TIME_PER_EPOCH = 1;
+        
+    # Calculate the number of samples per epoch
+    SAMPLES_PER_EPOCH = ceil(SAMPLING_FREQUENCY * TIME_PER_EPOCH);
+    
+    # Calculate the maximum number of EEG samples to hold
+    MAX_SAMPLES_TO_HOLD = ceil(SAMPLING_FREQUENCY * HOLDING_TIME);
+    
+    # Calculate the number of EEG epochs to hold
+    EPOCHS_TO_HOLD = ceil(FLASH_FREQUENCY * HOLDING_TIME);
+    
+    # Calculate the number of stimuli trials to hold
+    STIMULI_TO_HOLD = EPOCHS_TO_HOLD;
+        
     ######################################
     #   Initialize processor variables   #
     ######################################
@@ -64,6 +260,48 @@ def Run(processor_outlet):
     # Track whether the processor is waiting for the first trial of the new classification
     waiting_start_new_classification = True;
     
+    ################################
+    #   Initialize EEG variables   #
+    ################################
+    
+    # Initialize EEG sample matrix
+    EEG_samples = np.zeros((MAX_SAMPLES_TO_HOLD,N_EEG_CHANNELS+1));
+    
+    # Initialize current EEG sample index to 1
+    EEG_sample_index = 1;
+    
+    # Initialize EEG epoch data (EEG samples neatly formatted into epochs)
+    # (This technically contains repeated data, but it's programmatically convenient)
+    EEG_epoch_data = np.zeros((EPOCHS_TO_HOLD, SAMPLES_PER_EPOCH, N_EEG_CHANNELS));
+    
+    # Initialize current EEG epoch index to 1
+    EEG_epoch_index = 1;
+    
+    # Count the total number of epochs received from the Cyton
+    # (in order to compare with the total number of trials received from the BCI)
+    total_epochs_received = 0;
+    #TODO: trim this in accordance with total_trials_received to prevent them from becoming annoyingly large
+    
+    ####################################
+    #   Initialize stimuli variables   #
+    ####################################
+    
+    # Initialize the stimuli trial matrix
+    stimuli_trial_data = np.zeros((STIMULI_TO_HOLD, N_OUTPUTS+1));
+    
+    # Initialize the stimuli trial index to 1
+    stimuli_trial_index = 1;
+    
+    # Count the total number of trials received from the BCI
+    # (in order to compare with the total number of epochs received from the Cyton)
+    total_trials_received = 0;
+    #TODO: trim this in accordance with total_epochs_received to prevent them from becoming annoyingly large
+    
+    
+    ########################################
+    #   Initialize statistical variables   #
+    ########################################
+        
     # Declare the correlation statistics
     non_target_means = np.empty((CORRELATION_DEGREE,1));
     non_target_stds = np.empty((CORRELATION_DEGREE,1));
@@ -83,7 +321,7 @@ def Run(processor_outlet):
     ##################################
     
     # Send restart request to BCI
-    restart_signal = np.zeros(N_OUTPUTS);
+    restart_signal = np.zeros(N_OUTPUTS).astype(int);
     restart_signal[-1] = N_OUTPUTS;
     processor_outlet.push_sample(restart_signal);
     
@@ -98,56 +336,22 @@ def Run(processor_outlet):
         ###################################
         
         # Check if stimulus input was received
+        stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
+        if(stimulus_input is not None):
         
-            # handle incoming stimulus codes
-            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~            
-            # Append the stimulus input to the stimulus data 
-        
-            # Increment the next stimulus index
-            
-            # Check if the stimulus index needs to roll over
-                
-                # Roll the stimulus index over to the start                
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+            # Appropriately handle the stimulus input
+            Handle_Incoming_Stimulus(stimulus_input);
             
         ##############################
         #   Check for new EEG data   #
         ##############################
     
         # Check if a new chunk of EEG data was received
-        
-            # Handle incoming eeg chunk
-            #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~        
-            # Format the chunk appropriately
+        EEG_chunk, _ = EEG_inlet.pull_chunk(0.0);
+        if(len(EEG_chunk)>0):
             
-            # Filter the chunk
-            
-            # Grab the size of the chunk
-            
-            # Grab the indices of the first trial start, if any exist
-            
-            # Check if this chunk causes data overflow
-            
-                # Check if a trial is already ongoing
-                
-                    # Append the chunk to the EEG data
-                    
-                    # Update the next EEG sample index
-                    
-                # Check if this chunk contains a trial start
-                
-                    # Add the trial-data portion of the chunk to the EEG data
-                    
-                    # Update the next EEG sample index
-                
-                # Else, this chunk does not contain any trial information
-                
-                    # Throw away the chunk by doing nothing with it
-            
-            # Else, this chunk causes data overflow
-            
-                # Raise error
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+            # Appropriately handle the chunk
+            Handle_Incoming_EEG_Chunk(EEG_chunk);
     
         ####################
         #   Handle Epoch   #
@@ -267,7 +471,8 @@ def Run(processor_outlet):
                 
     
         pass;    
-    
+        
+    Shutdown_Processor();    
       
     #TODO: remove this
     """
