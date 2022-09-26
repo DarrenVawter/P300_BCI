@@ -19,6 +19,7 @@
 # External Modules
 import time;
 import numpy as np;
+from scipy import signal as Signal;
 from math import ceil;
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
 
@@ -96,6 +97,44 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         # End of Handle_Incoming_Stimulus()
         pass;
         
+    """
+    
+    Filter_Chunk()
+    
+        This function filters each EEG channel of the chunk, 1 at a time,
+        using, in order, a 60Hz notch, a 120Hz notch, a 1Hz<->40Hz butterworth
+        bandpass, and a FLASH_FREQUENCY Hz filter.
+    
+        arguments:
+            [EEG_chunk]: Most recent chunk from the EEG_inlet 
+        returns:
+            [EEG_chunk]: The same chunk, but with its EEG channels filter
+        exceptions:
+            [none]
+    
+        --> For each EEG channel
+                
+            --> Apply the cascade filter to the chunk and track the filter states
+            
+        --> Return the EEG chunk
+            
+        
+    """
+    def Filter_Chunk(EEG_chunk):
+        
+        nonlocal n60_b, n120_b, nf_b, bp_b, n60_a, n120_a, nf_a, bp_a, n60_z, n120_z, nf_z, bp_z;
+        
+        # Filter each channel of the chunk
+        for channel in range(N_EEG_CHANNELS):
+                        
+            EEG_chunk[:, channel], n60_z[channel,:] = Signal.lfilter(n60_b, n60_a, EEG_chunk[:, channel], zi=n60_z[channel,:]);
+            EEG_chunk[:, channel], n120_z[channel,:] = Signal.lfilter(n120_b, n120_a, EEG_chunk[:, channel], zi=n120_z[channel,:]);
+            EEG_chunk[:, channel], nf_z[channel,:] = Signal.lfilter(nf_b, nf_a, EEG_chunk[:, channel], zi=nf_z[channel,:]);
+            EEG_chunk[:, channel], bp_z[channel,:] = Signal.lfilter(bp_b, bp_a, EEG_chunk[:, channel], zi=bp_z[channel,:]);
+            
+        # End of Filter_Chunk
+        return EEG_chunk;
+        
         
     """
     
@@ -148,7 +187,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         nonlocal EEG_samples, EEG_sample_index, processor_running;
         
         # Filter the chunk
-        #TODO: this
+        EEG_chunk = Filter_Chunk(EEG_chunk);
             
         # Grab the size of the chunk
         chunk_size = len(EEG_chunk);
@@ -439,17 +478,24 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
     ##########################
     #   Initialize Filters   #
-    ##########################
-    
-    # Filter out US main line noise (and first resonant echo)
-    # Create a 60Hz notch filter with -3dB attenuation @ +-1Hz
-    # Create a 120Hz notch filter with -3dB attenuation @ +-1Hz
-    
+    ##########################    
+
+    # Create a 60Hz notch filter with -3dB attenuation @ +-1Hz (main line)
+    n60_b, n60_a = Signal.iirnotch(60, 60, fs=SAMPLING_FREQUENCY);
+    # Create a 120Hz notch filter with -3dB attenuation @ +-1Hz (maine line echo)
+    n120_b, n120_a = Signal.iirnotch(120, 60, fs=SAMPLING_FREQUENCY);
     # Filter out flash frequency to remove SSVEP component from signal
     # Create a flash-frequency filter with -3dB at +-0.2Hz
-    
-    # Create a butterworth BP filter with edges @ 1Hz and 40Hz
-    
+    nf_b, nf_a = Signal.iirnotch(FLASH_FREQUENCY, 60, fs=SAMPLING_FREQUENCY);
+    # Create a bandpass butterworth filter with corner frequencies @ 1Hz and 40Hz
+    bp_b, bp_a = Signal.butter(N=2, Wn=[1, 40], btype="bandpass", fs=SAMPLING_FREQUENCY);
+
+    # Track the respective filter states
+    n60_z = np.zeros((N_EEG_CHANNELS, 2));
+    n120_z = np.zeros((N_EEG_CHANNELS, 2));
+    nf_z = np.zeros((N_EEG_CHANNELS, 2));
+    bp_z = np.zeros((N_EEG_CHANNELS, 4));
+
     ######################################
     #   Initialize processor constants   #
     ######################################
@@ -520,8 +566,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     total_trials_received = 0;
     #TODO: trim this in accordance with total_epochs_received to prevent them from becoming annoyingly large
     #TODO: detect large gaps between this and total_epochs_received (to allow one to catch up)
-    
-    
+        
     ########################################
     #   Initialize statistical variables   #
     ########################################
