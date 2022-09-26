@@ -10,6 +10,7 @@ import numpy as np; # fast arrays&manipulation
 import math; # floor
 import pygame; # display to the screen and play sounds
 import d3dshot; # grab screen pixels
+import pyautogui;
 
 # Internal Modules
 from BCI_Enumerations import BCI_Interaction; # definitions for enumerated data types
@@ -190,6 +191,16 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         # End of Get_Tile_Rect()
         pass;
         
+    def Shutdown_Overlay():
+
+        nonlocal screen_grabber, overlay_running;
+
+        del screen_grabber;
+        overlay_running = False;
+        
+        # End of Shutdown_Overlay()
+        pass;
+        
     ##############################
     #   Functional entry point   #
     ##############################
@@ -232,8 +243,19 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     ##################################
     
     # Initialize screen grabber object
-    screen_grabber = d3dshot.create(capture_output="numpy", frame_buffer_size=1);
-    screen_grabber.display = screen_grabber.displays[1];
+    screen_grabber = d3dshot.create(capture_output="numpy", frame_buffer_size=1);    
+    screen_grabber.display = screen_grabber.displays[0];
+    
+    #TODO: make this part way less ghetto
+    # Force-refresh the main screen by quickly alt-tabbing
+    pyautogui.keyDown('alt');
+    pyautogui.keyDown('tab');
+    pyautogui.press('esc');
+    pyautogui.keyUp('tab');
+    pyautogui.keyUp('alt');
+    
+    # Move the mouse to the center of the mirror to show where a click would be
+    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2)
     
     # Initialize game clock to cap fps
     clock = pygame.time.Clock();
@@ -259,9 +281,6 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     # Track whether or not the current trial is the start of a new trial
     start_new_classification = False;
-        
-    #TODO: remove
-    print(Get_Tile_Rect(88));
     
     #########################
     #   Main Overlay Loop   #
@@ -310,6 +329,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 else:
                     
                     # Return appropriate BCI control interaction
+                    Shutdown_Overlay();
                     return (BCI_Interaction.MAGNIFY_TILE, Get_Tile_Rect(classification_id));
                     
                 # Flag to start a new classification
@@ -417,8 +437,8 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
         # Check to see if the program was closed through physical controls
         for event in pygame.event.get():
-           if(event.type == pygame.QUIT):               
-               overlay_running = False;
+           if(event.type == pygame.QUIT):      
+               Shutdown_Overlay();
                return (BCI_Interaction.EXIT,None);
                
         #TODO: remove this   
