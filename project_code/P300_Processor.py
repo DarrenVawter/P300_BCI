@@ -21,15 +21,12 @@ import numpy as np;
 from pylsl import StreamInlet, resolve_stream; # communicating with BCI
 
 # Internal Modules
-from BCI_Constants import N_TILES, N_KEYS;
+from BCI_Constants import N_OUTPUTS;
 
 #############################
 #   Processor Entry point   #
 #############################
 def Run(processor_outlet):
-    
-    # Caclulate number of outputs
-    N_OUTPUTS = max(N_TILES,N_KEYS);
     
     # Grab an inlet to the BCI stream
     inlet_stream = resolve_stream('type', 'P300_Stimuli');
@@ -37,10 +34,14 @@ def Run(processor_outlet):
     
     # Simulate a fake classification
     import time;
-    time.sleep(10);
         
+    time.sleep(10);
     fake_classification = np.zeros(N_OUTPUTS).astype(int);
-    fake_classification[-1] = -12;
+    fake_classification[-1] = -2;
+    processor_outlet.push_sample(fake_classification);
+    
+    time.sleep(10);
+    fake_classification[-1] = -30;
     processor_outlet.push_sample(fake_classification);
 
 

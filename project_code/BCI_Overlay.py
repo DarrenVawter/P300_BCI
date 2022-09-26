@@ -13,9 +13,11 @@ import d3dshot; # grab screen pixels
 import pyautogui;
 
 # Internal Modules
-from BCI_Enumerations import BCI_Interaction; # definitions for enumerated data types
+from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Interaction, Stimuli_Trial; # definitions for enumerated data types
+
+#TODO: swap these out (later, because it will generate annoying warnings)
 #from BCI_Constants import *; # pull constants from header
-from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH; # pull constants from header
+from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, N_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
@@ -71,7 +73,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     """
     def Choose_Flash_Tiles():
         
-        #TODO: handle if N_TILES is not a multiple of N_TILES_PER_FLASH
+        #TODO: dynamically handle if N_TILES is not a multiple of N_TILES_PER_FLASH
         
         nonlocal flash_bucket, current_flash_group;
         
@@ -190,7 +192,71 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
         # End of Get_Tile_Rect()
         pass;
+       
+    """
+    
+    Handle_Click()
+    
+        This function handles a BCI-triggered mouse click.
         
+        arguments:
+            [click_type]: string --> The type of mouse click. (left/right/double)
+        returns:
+            [none]
+        exceptions:
+            TypeError: if click_type is not a string
+            ValueError: if click_type is not "left", "right", or "double"
+            
+    """
+    def Handle_Click(click_type):
+        
+        nonlocal magnification_rect;
+        
+        # Validate click_type type
+        if(type(click_type) != str):
+            raise TypeError("[click_type] must be a string.");
+                    
+        # Validate click_type value
+        if(not(click_type=="left" or click_type=="right" or click_type=="double")):
+            raise ValueError("[click_type] must be 'left', 'right', or 'double'.");  
+            
+        # Calculate the mouse coordinates
+        mouse_x = round((magnification_rect[0]+magnification_rect[2])/2);
+        mouse_y = round((magnification_rect[1]+magnification_rect[3])/2);
+
+        # Click the appropriate location
+        if(click_type=="double"):
+            pyautogui.doubleClick(x=mouse_x, y=mouse_y);
+        else:
+            pyautogui.click(x=mouse_x, y=mouse_y, button=click_type);
+            
+        # Return the mouse to the center of the overlay
+        pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
+        
+        # Reset the magnification rect to the full screen
+        magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];
+
+        # End of Handle_Click()
+        pass; 
+       
+    """
+    
+    Shutdown_Overlay()
+    
+        This function prepares the overlay module to safely return.
+    
+        arguments:
+            [none]
+        returns:
+            [none]
+        exceptions:
+            [none]
+    
+        --> Delete/destroy/close/disable relevant variable and objects
+        
+        --> Return
+        
+    """
     def Shutdown_Overlay():
 
         nonlocal screen_grabber, overlay_running;
@@ -224,8 +290,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Number of tiles in the overlay interface
     N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
-    
-    
+        
     # Amount of time, in seconds, to flash each group for
     FLASH_DURATION = 0.1;
     
@@ -234,9 +299,25 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Load and scale flash images
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
-    for i in range(10):
+    for i in range(N_FLASH_IMAGES):
         FLASH_IMAGES[i] = pygame.image.load('league_icons/'+str(i)+'.jpg')
         FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH, TILE_HEIGHT));
+        
+    # Load and scale interaction icons
+    BCI_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
+    BCI_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75, 0.75, 0.75, 0.5, 0.5, 1, 0.7]);
+    BCI_ICON_WIDTH = np.multiply(BCI_ICON_HEIGHT,[0.72, 0.72, 0.72, 0.85, 0.85, 1, 2]);
+    for i in range(N_BCI_CONTROLS):
+        BCI_INTERACTION_ICONS[i] = pygame.image.load('BCI_interaction_icons/'+str(i)+'.png')
+        BCI_INTERACTION_ICONS[i] = pygame.transform.scale(BCI_INTERACTION_ICONS[i], (BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]));
+        
+    # Load and scale interaction icons
+    OVERLAY_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
+    OVERLAY_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75]);
+    OVERLAY_ICON_WIDTH = np.multiply(OVERLAY_ICON_HEIGHT,[1]);
+    for i in range(N_OVERLAY_CONTROLS):
+        OVERLAY_INTERACTION_ICONS[i] = pygame.image.load('overlay_interaction_icons/'+str(i)+'.png')
+        OVERLAY_INTERACTION_ICONS[i] = pygame.transform.scale(OVERLAY_INTERACTION_ICONS[i], (OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]));
         
     ##################################
     #   Initialize overlay objects   #
@@ -245,17 +326,9 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
     # Initialize screen grabber object
     screen_grabber = d3dshot.create(capture_output="numpy", frame_buffer_size=1);    
     screen_grabber.display = screen_grabber.displays[0];
-    
-    #TODO: make this part way less ghetto
-    # Force-refresh the main screen by quickly alt-tabbing
-    pyautogui.keyDown('alt');
-    pyautogui.keyDown('tab');
-    pyautogui.press('esc');
-    pyautogui.keyUp('tab');
-    pyautogui.keyUp('alt');
-    
+        
     # Move the mouse to the center of the mirror to show where a click would be
-    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2)
+    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
     
     # Initialize game clock to cap fps
     clock = pygame.time.Clock();
@@ -291,9 +364,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         #############################
         #   Handle external input   #
         #############################
-        
-        #TODO: this
-        
+                
         # Check LSL for input
         processor_input, _ = processor_inlet.pull_sample(0.0);
         if(processor_input is not None):
@@ -312,25 +383,84 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     classification_id = int(-(processor_flag+1));
                 else:
                     raise TypeError("Received non-integer classification ID from processor.");
-                    
-                # Check if classified tile is a BCI control option
-                if(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
-
-                    # Return appropriate BCI control interaction
-                    pass;
-                
+                                    
                 # Check if classified tile is an overlay control option
-                elif(math.floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
+                if(math.floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
-                    # Return appropriate BCI control interaction
-                    pass;
+                    # Convert control to overlay interaction
+                    overlay_interaction = Overlay_Interaction(classification_id%N_TILE_COLUMNS);
+                    
+                    # Check if the user zoomed out
+                    if(overlay_interaction == Overlay_Interaction.REVERT_MAGNIFICATION):
+                                            
+                        # Revert magnification to full screen
+                        #TODO: store the last zoom level and revert to that instead    
+                        magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];                       
+                        
+                # Check if classified tile is a BCI control option
+                elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
+
+                    # Convert control to BCI interaction
+                    BCI_interaction = BCI_Interaction(math.floor(classification_id/N_TILE_COLUMNS));
+                    
+                    # Check if the user left clicked
+                    if(BCI_interaction == BCI_Interaction.CLICK):
+                        
+                        # Handle the left click
+                        Handle_Click("left");
+                                                
+                    # Check if the user double clicked
+                    elif(BCI_interaction == BCI_Interaction.DOUBLE_CLICK):  
+                        
+                        # Handle the double click
+                        Handle_Click("double");
+                        
+                    # Check if the user right clicked
+                    elif(BCI_interaction == BCI_Interaction.RIGHT_CLICK):    
+                        
+                        # Handle the right click
+                        Handle_Click("right");  
+                        
+                    # Check if the user pressed page up
+                    elif(BCI_interaction == BCI_Interaction.PAGE_UP):  
+                        
+                        # Press the page up key
+                        pyautogui.press("pageup");  
+                        
+                    # Check if the user pressed page down
+                    elif(BCI_interaction == BCI_Interaction.PAGE_DOWN): 
+                        
+                        # Press the page down key
+                        pyautogui.press("pagedown");  
+                        
+                    # Check if the user tabbed
+                    elif(BCI_interaction == BCI_Interaction.TAB):  
+                        
+                        # Press the tab key
+                        pyautogui.press("tab");  
+                        
+                    # Check if the user pressed enter
+                    elif(BCI_interaction == BCI_Interaction.ENTER):   
+                        
+                        # Press the enter key 
+                        pyautogui.press("enter");                                     
                     
                 # Else, classified tile is a magnification tile
                 else:
+
+                    # Update the magnification rect
+                    magnification_rect = Get_Tile_Rect(classification_id);
                     
-                    # Return appropriate BCI control interaction
-                    Shutdown_Overlay();
-                    return (BCI_Interaction.MAGNIFY_TILE, Get_Tile_Rect(classification_id));
+                    #TODO: find a way less ghetto solution than this
+                    # Force-refresh the main screen by quickly alt-tabbing
+                    pyautogui.keyDown('alt');
+                    pyautogui.keyDown('tab');
+                    pyautogui.press('esc');
+                    pyautogui.keyUp('tab');
+                    pyautogui.keyUp('alt');
+                    
+                    # Move the mouse to the center of the mirror to show where a click would be
+                    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
                     
                 # Flag to start a new classification
                 start_new_classification = True;
@@ -340,8 +470,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             
                 # Update tile probabilities
                 tile_probabilities = processor_input;
-                
-        
+                        
         ##########################
         #   Handle flash group   #
         ##########################
@@ -352,12 +481,31 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Pick the next flash group
             Choose_Flash_Tiles();
                         
+            # Convert flash data to 1 hot array
+            stimuli_data = np.zeros(N_OUTPUTS+1).astype(int);
+            stimuli_data[current_flash_group] = 1;
+            
+            #TODO: add synchronizer back in to determine if the trial is a sync trial
+            
+            # Append the trial's code to the array            
+            # Check if the trial is the first trial of a new classification
+            if(start_new_classification):
+                
+                # Trial is the start of a new classification but is a not a sync trial
+                stimuli_data[-1] = Stimuli_Trial.NON_SYNC_START;
+                
+                # Reset new classification flag
+                start_new_classification = False;
+                
+            # Else, the trial is not the first trial of a new classification
+            else:
+                
+                # Trial is not the start of a new classification and is a not a sync trial                
+                stimuli_data[-1] = Stimuli_Trial.NON_SYNC;
+            
             # Send the flash data to the processor
-            #TODO: this
-            
-            # Reset new classification flag
-            start_new_classification = False;
-            
+            stimuli_outlet.push_sample(stimuli_data);
+           
             # Randomize the order of the flash images
             np.random.shuffle(flash_image_indices);
             
@@ -391,14 +539,28 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         #   Render the BCI controls   #
         ###############################
         
-        #TODO: this
+        # Iterate over the BCI control options
+        for i in range(N_BCI_CONTROLS):
+
+            #TODO: remove this when the icon for double click is fixed
+            if(i==1):
+                canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH-BCI_ICON_WIDTH[i]), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
+                canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
+                continue;                
+                
+            # Renderthe appropriate BCI control icon
+            canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH-BCI_ICON_WIDTH[i]/2), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
         
         ###################################
         #   Render the overlay controls   #
         ###################################
                 
-        #TODO: this
-                
+        # Iterate over the BCI control options
+        for i in range(N_OVERLAY_CONTROLS):
+
+            # Renderthe appropriate BCI control icon
+            canvas.blit(OVERLAY_INTERACTION_ICONS[i],[round((i+0.5)*TILE_WIDTH-OVERLAY_ICON_WIDTH[i]/2), round((N_TILE_ROWS-0.5)*TILE_HEIGHT-OVERLAY_ICON_HEIGHT[i]/2), OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]]);       
+        
         ######################################################
         #   Render flash images over the appropriate tiles   #
         ######################################################
@@ -413,7 +575,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
             col = current_flash_group[i] % N_TILE_COLUMNS;
             
             # Render the corresponding flash image
-            canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT])        
+            canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);      
         
         ###################################
         #   Finalize and draw the frame   #
@@ -439,7 +601,7 @@ def Run(canvas, magnification_rect, stimuli_outlet, processor_inlet):
         for event in pygame.event.get():
            if(event.type == pygame.QUIT):      
                Shutdown_Overlay();
-               return (BCI_Interaction.EXIT,None);
+               return (Program_Interaction.EXIT,None);
                
         #TODO: remove this   
         # calc & print framerate/item performance

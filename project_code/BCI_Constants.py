@@ -35,6 +35,9 @@ FRAMERATE_CAP = 250;
 #   Overlay Constants   #
 #########################
 
+# Number of tiles flashed with each stimulus
+N_TILES_PER_FLASH = 10;
+
 # Number of rows/cols to divide the overlay into
 N_TILE_ROWS = 10;
 N_TILE_COLUMNS = 10;
@@ -42,8 +45,9 @@ N_TILE_COLUMNS = 10;
 # Total number of tiles on the overlay interface
 N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
 
-# Number of tiles flashed with each stimulus
-N_TILES_PER_FLASH = 10;
+# Number of BCI interactions in the overlay interface
+N_BCI_CONTROLS = 7;
+N_OVERLAY_CONTROLS = 1;
 
 ##########################
 #   Keyboard Constants   #
@@ -55,6 +59,12 @@ N_KEYS = 45;
 # Number of keys flashed with each stimulus
 N_KEYS = 7;
 
+##########################
+#   BCI-wide Constants   #
+##########################
+    
+# Caclulate number of outputs
+N_OUTPUTS = max(N_TILES,N_KEYS);
 
 
 

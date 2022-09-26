@@ -20,7 +20,7 @@ import pyautogui; # virtual monitor/mouse/keyboard
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_stream; # communicating with P300 Processor
 
 # Internal Modules
-from BCI_Enumerations import BCI_Mode, BCI_Interaction; # definitions for enumerated data types
+from BCI_Enumerations import BCI_Mode, BCI_Interaction, Program_Interaction; # definitions for enumerated data types
 from BCI_Constants import N_TILES, N_KEYS; # pull constants from header
 import BCI_Overlay; # run screen overlay using P300 speller
 import BCI_Keyboard; # run keyboard using P300 speller 
@@ -95,27 +95,20 @@ while(BCI_running):
     if(current_BCI_mode == BCI_Mode.OVERLAY_INTERFACE):   
         
         # Launch the BCI screen overlay
-        print(magnification_rect)
-        (interaction, data) = BCI_Overlay.Run(canvas, magnification_rect, stimuli_outlet, processor_inlet);    
+        (program_interaction, data) = BCI_Overlay.Run(canvas, magnification_rect, stimuli_outlet, processor_inlet);    
         
     # Check if the BCI is currently in keyboard mode
     elif(current_BCI_mode == BCI_Mode.KEYBOARD_INTERFACE):   
         
         # Launch the BCI keyboard
-        (interaction, data) = BCI_Keyboard.Run(stimuli_outlet, processor_inlet);    
+        (program_interaction, data) = BCI_Keyboard.Run(stimuli_outlet, processor_inlet);    
     
-    ################################
-    #   Handle BCI interactions    #
-    ################################
+    ####################################
+    #   Handle Program interactions    #
+    ####################################
     
-    # Check if the user magnified a tile
-    if(interaction == BCI_Interaction.MAGNIFY_TILE):
-        
-        # Update the magnification rect
-        magnification_rect = data;        
-        
     # Check if the program was closed through the BCI controls
-    elif(interaction == BCI_Interaction.EXIT):
+    if(program_interaction == Program_Interaction.EXIT):
        pygame.quit();
        BCI_running = False;
        break;
