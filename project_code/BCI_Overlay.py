@@ -17,7 +17,7 @@ from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Inter
 
 #TODO: swap these out (later, because it will generate annoying warnings)
 #from BCI_Constants import *; # pull constants from header
-from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
+from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_GUI_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #

@@ -15,28 +15,8 @@ RED = (255, 0, 0);
 BLUE = (0, 255, 0);
 GREEN = (0, 0, 255);
 
-########################
-#   SYSTEM CONSTANTS   #
-########################
-
-# Monitor parameters
-from pyautogui import size;
-SCREEN_WIDTH, SCREEN_HEIGHT = size();
-SCREEN_DIMENSIONS = [SCREEN_WIDTH, SCREEN_HEIGHT];
-
-# EEG parameters
-N_EEG_CHANNELS = 8;
-SAMPLING_FREQUENCY = 250;
-    
-########################
-#   Pygame Constants   #
-########################
-
-# FPS to limit pygame engine to
-FRAMERATE_CAP = 250;
-
 #########################
-#   Overlay Constants   #
+#   Overlay constants   #
 #########################
 
 # Number of tiles flashed with each stimulus
@@ -54,31 +34,48 @@ N_BCI_CONTROLS = 7;
 N_OVERLAY_CONTROLS = 1;
 
 ##########################
-#   Keyboard Constants   #
+#   Keyboard constants   #
 ##########################
 
 # Number of keys on the keyboard interface
 N_KEYS = 45;
 
 # Number of keys flashed with each stimulus
-N_KEYS = 7;
+N_KEYS_PER_FLASH = 7;
 
-##########################
-#   BCI-wide Constants   #
-##########################
+###################################
+#   BCI-wide physical constants   #
+###################################
 
-# Default call classification threshold
+# Monitor parameters
+#TDOO: ensure this matches the desired monitor + if there is a better library
+from pyautogui import size;
+SCREEN_WIDTH, SCREEN_HEIGHT = size();
+SCREEN_DIMENSIONS = [SCREEN_WIDTH, SCREEN_HEIGHT];
+
+# EEG parameters
+N_EEG_CHANNELS = 8;
+SAMPLING_FREQUENCY = 250;
+
+##################################
+#   BCI-wide program constants   #
+##################################
+
+# Default cell classification threshold
 DEFAULT_THRESHOLD = 0.95;
     
-# Caclulate number of outputs
-N_OUTPUTS = max(N_TILES,N_KEYS);
+# Caclulate the number of outlets in the processor and stimuli streams
+N_PROCESSOR_OUTPUTS = max(N_TILES,N_KEYS);
+N_GUI_OUTPUTS = N_PROCESSOR_OUTPUTS + 1;
 
-# Amount of time, in seconds, to flash each group for
+# Amount of time, in seconds, to present each stimulus for
 FLASH_DURATION = 0.1;
 
-# Group flash frequency in Hz
+# Stimulus presentation frequency, in Hz
 FLASH_FREQUENCY = 1/FLASH_DURATION;
 
+# FPS to limit pygame engine to
+FRAMERATE_CAP = 250;
 
 
 
