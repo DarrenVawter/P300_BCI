@@ -15,7 +15,7 @@
 #TODO: port MATLAB processor into Python
 #TODO: port MATLAB processor into Python
 #TODO: port MATLAB processor into Python
-    
+
 # External Modules
 import time;
 import numpy as np;
@@ -24,17 +24,30 @@ from scipy.io import loadmat as LoadMAT;
 from scipy.stats import multivariate_normal as MVN;
 from math import ceil;
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
+import logging; # print pretty console logs
 
 # Internal Modules
-from BCI_Enumerations import Stimuli_Code;
-from BCI_Constants import N_OUTPUTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
+from BCI_Enumerations import Stimuli_Code, Processor_Code;
+from BCI_Constants import N_STREAM_ELEMENTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
+from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
 
+#TODO: wrap this
+# Create a console logger for pretty formatting
+console = logging.getLogger("P300_Processor.py");
+console.setLevel(logging.DEBUG);
+if(console.hasHandlers()):
+    console.handlers.clear();
+ch = logging.StreamHandler();
+ch.setFormatter(Logging_Formatter());
+console.addHandler(ch);
+    
 #############################
 #   Processor Entry point   #
 #############################
 def Run(processor_outlet, stimuli_inlet, EEG_inlet):
-        
-    #TODO: update & move this
+            
+    
+    #TODO: move this and make it dynamic (re-calc on classification)
     NON_TARGET_MULTIPLIER = 100/10 - 1;
     
     ###############################
@@ -72,33 +85,68 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     """
     def Handle_Incoming_Stimulus(stimulus_input):
                  
-        nonlocal processor_running, stimuli_trial_data, stimuli_trial_index, total_trials_received;
+        nonlocal processor_running, stimuli_trial_data, stimuli_trial_index, total_trials_received, waiting_start_new_classification;
         
-        # Check if stimulus_input is the shutdown signal
-        if(np.sum(stimulus_input) == -N_OUTPUTS*(N_OUTPUTS+1)):
-
-            #TODO: Re-wrap this, lol            
-            # Flag for shutdown
-            processor_running = False;
-            print("[P300_Processor.py]:","Shutting down...");  
-            raise KeyboardInterrupt("mehx2");
+        # Grab the stimuli code
+        stimuli_code = Stimuli_Code(stimulus_input[-1]);
+        
+        # Check if the stream data is a trial inquiry
+        if(stimuli_code == Stimuli_Code.NON_SYNC
+           or stimuli_code == Stimuli_Code.SYNC
+           or stimuli_code == Stimuli_Code.NON_SYNC_START
+           or stimuli_code == Stimuli_Code.SYNC_START):
             
-                    
-        # Append the stimulus input to the stimulus data
-        stimuli_trial_data[stimuli_trial_index,:] = stimulus_input[:];
-        
-        # Increment the next stimulus index
-        stimuli_trial_index += 1;        
-        
-        # Check if the stimulus index needs to roll over
-        if(stimuli_trial_index >= STIMULI_TO_HOLD):
+            if(waiting_start_new_classification and (stimuli_code == Stimuli_Code.SYNC or stimuli_code == Stimuli_Code.SYNC)):
+                # This data is outdated, waiting to receive new classification data
+                pass;
+                        
+            # Append the stimulus input to the stimulus data
+            stimuli_trial_data[stimuli_trial_index,:] = stimulus_input[:-1];
             
-            # Roll the stimulus index over to the start  
-            stimuli_trial_index = 0;
-
-        # Increment the count of trials received    
-        total_trials_received += 1;       
-           
+            # Increment the next stimulus index
+            stimuli_trial_index += 1;        
+            
+            # Check if the stimulus index needs to roll over
+            if(stimuli_trial_index >= STIMULI_TO_HOLD):
+                
+                # Roll the stimulus index over to the start  
+                stimuli_trial_index = 0;
+    
+            # Increment the count of trials received    
+            total_trials_received += 1;      
+            
+        # Check if the stream data is training data
+        elif(stimuli_code == Stimuli_Code.TRAINING):
+            #TODO: this
+            pass;
+            
+        # Check if the stream data is a start request
+        elif(stimuli_code == Stimuli_Code.START):
+            #TODO: this probably shouldn't happen --> decide what to do
+            pass;
+            
+        # Check if the stream data is a restart request
+        elif(stimuli_code == Stimuli_Code.RESTART):
+            #TODO: decide what to do when the interface is requesting a restart
+            #(if this is even necessary)
+            pass;
+            
+        # Check if the stream data is a program shutdown announcement
+        elif(stimuli_code == Stimuli_Code.BCI_SHUTDOWN):
+            #TODO: generate a different kind of interrupt here
+            raise KeyboardInterrupt("BCI shutdown signal received.");
+            
+        # Check if the stream data is an interface shutdown announcement
+        elif(stimuli_code == Stimuli_Code.INTERFACE_SHUTDOWN):
+            #TODO: decide what to do when the interface shuts down
+            # (this will happen whenever switching between the keyboard & overlay)
+            pass;
+            
+        # Check if the stimuli code is something unexpected
+        else:
+            #TODO: be more specific with the error type
+            raise RuntimeError("Unexpected stimulus code received.");
+                                               
         # End of Handle_Incoming_Stimulus()
         pass;
         
@@ -141,7 +189,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
                 
     """
     
-    Handle_Incoming_Stimulus()
+    Handle_Incoming_EEG_Chunk()
     
         This function properly trims and adds the most recent chunk of EEG
         samples from the EEG inlet to the EEG_samples matrix.
@@ -286,11 +334,12 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         # Grab Cyton's sync code
         # (negative trial stamp indicates a sync trial)
         
-        Cyton_sync_code = (EEG_samples[0,-1] < 0);    
+        Cyton_sync_code = (EEG_samples[0,-1] < 0);   
         
         # Grab BCI's sync flag
         BCI_sync_code = stimuli_trial_data[EEG_epoch_index,-1];
-                
+        BCI_sync_code = (BCI_sync_code == Stimuli_Code.SYNC_START) or (BCI_sync_code == Stimuli_Code.NON_SYNC_START);
+        
         # >=0 --> training mode, check the cell code at that index
         if(BCI_sync_code >= 0):
             BCI_sync_code = stimuli_trial_data[EEG_epoch_index,BCI_sync_code];
@@ -426,8 +475,8 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         waiting_start_new_classification = False;
                     
         # Reset cell probabilities
-        cell_probabilities = np.ones(N_OUTPUTS);
-        unused_cells = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == -1);
+        cell_probabilities = np.ones(N_STREAM_ELEMENTS-1);
+        unused_cells = np.where(stimuli_trial_data[EEG_epoch_index,:] == -1);
         cell_probabilities[unused_cells] = 0;
         cell_probabilities[:] = cell_probabilities[:]/np.sum(cell_probabilities);
     
@@ -445,7 +494,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         else:
     
             # Use default threshold values for used cells
-            cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_OUTPUTS);
+            cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_STREAM_ELEMENTS-1);
             
             # Use >100% threshold value for unused cells
             cell_thresholds[unused_cells] = 2;
@@ -453,7 +502,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         # End of Start_New_Classification();
         pass;
         
-    # Calculate the correlation coefficients
+    #TODO: Calculate_Correlation_Coefficients() docstring
     def Calculate_Correlation_Coefficients(normalized_epoch):
         
         nonlocal mwms_classifer;
@@ -486,7 +535,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
         return correlation_coefficients;
     
-    # Calculate trial probability
+    #TODO: Calculate_Trial_Probability() docstring
     def Calculate_Trial_Probability(correlation_coefficients):         
 
         # Generate an independent probability that this trial was a non-target trial
@@ -503,7 +552,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
         return trial_target_probability;
     
-    # Update cell probabilities
+    #TODO: Update_Probabilities docstring()
     def Update_Probabilities(trial_probability): 
         
         nonlocal cell_probabilities;
@@ -530,7 +579,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
         pass;
         
-    # Broadcast classification status
+    #TODO: Broadcast_Classification_Status() docstring
     def Broadcast_Classification_Status():
         
         nonlocal waiting_start_new_classification;
@@ -548,14 +597,18 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
             
             # Broadcast the classification result
             # (offset by 1 then multiply by -1 as per scheme)           
-            res = -most_probable_cell * np.ones(N_OUTPUTS);
+            res = np.zeros(N_STREAM_ELEMENTS); # processor code = 0 --> classification
+            res[most_probable_cell] = 1;
             processor_outlet.push_sample(res);
         
         # Else, a classification is not ready
         else:
         
-            # Broadcast the current probabilities
-            processor_outlet.push_sample(cell_probabilities);
+            # Broadcast the current probabilities    
+            res = np.empty(N_STREAM_ELEMENTS);
+            res [:-1] = cell_probabilities;
+            res[-1] = Processor_Code.PROBABILITY_UPDATE;
+            processor_outlet.push_sample(res);
                 
         pass;
         
@@ -653,7 +706,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     ####################################
     
     # Initialize the stimuli trial matrix
-    stimuli_trial_data = np.zeros((STIMULI_TO_HOLD, N_OUTPUTS+1));
+    stimuli_trial_data = np.zeros((STIMULI_TO_HOLD, N_STREAM_ELEMENTS-1));
     
     # Initialize the stimuli trial index to 0
     stimuli_trial_index = 0;
@@ -676,56 +729,67 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     target_cov = np.array(mat_dict['target_cov']);
             
     # Initialize cell probabilities
-    cell_probabilities = np.ones(N_OUTPUTS)/N_OUTPUTS;
+    #TODO: make sure this is okay
+    cell_probabilities = np.ones(N_STREAM_ELEMENTS-1)/(N_STREAM_ELEMENTS-1);
     
     # Initialize threshold values
     #TODO: initialize dynamically
-    cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_OUTPUTS);
+    cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_STREAM_ELEMENTS-1);
     
+    # Define the non target and target distributions
     non_target_mvn = MVN(mean = non_target_means, cov = non_target_cov);
     target_mvn = MVN(mean = target_means, cov = target_cov);
     
     ##################################
     #   Synchronize start with BCI   #
     ##################################
-            
-    dummy_signal = np.zeros(N_OUTPUTS).astype(int);
-    dummy_signal[-1] = 12345;
-    dummy_signal[1] = -12345;
     
-    # Wait for BCI to connect
-    print("waiting for processor")
+    # Wait for BCI to connect and send a start request
+    console.info("Waiting for BCI to request start...");
     while(True):
-        stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
+        
+        # Check for new input from the BCI
+        # (Waiting for input 100ms at most, then trying again to allow for interrupts) 
+        stimulus_input, _ = stimuli_inlet.pull_sample(0.1);
         if(stimulus_input is not None):
-            break;
-        else:
-            processor_outlet.push_sample(dummy_signal);
-            print("sent dummy")
-            time.sleep(0.25);        
-        
-    print("BCI connected")
-        
-        
-    # Send restart request to BCI
-    restart_signal = np.zeros(N_OUTPUTS).astype(int);
-    restart_signal[-1] = N_OUTPUTS;
-    processor_outlet.push_sample(restart_signal);
+            
+            # Check if the received signal is the start request
+            if(stimulus_input[-1] == Stimuli_Code.START):
+                
+                # Exit the blocking loop
+                break;
+            
+            # Else, a different signal was received
+            else:
+                
+                #TODO: implement raising/handling an error since we should only expect a start request here
+                #TODO: ^----? maybe ?
+                console.warning("Received stimuli code",Stimuli_Code(stimulus_input[-1]),"when start request was expected.");
+  
+    console.info("Start request received from BCI.");    
+            
+    #TODO: make this less ghetto
+    # Let the Cyton Data Packager know a consumer is connecting
+    EEG_inlet.pull_chunk();
+    console.info("Forcing data packager to dump samples for a few seconds...");
+    time.sleep(5);
+    # Discard the setup chunk
+    # (this setup chunk will contain the FTDI turning on prior to the pins stabalizing --> we want to throw this out)
+    EEG_inlet.pull_chunk(0.0);
+
+    # Send the start signal to the BCI
+    console.info("Sending start signal to BCI.");
+    start_signal = np.empty(N_STREAM_ELEMENTS);
+    start_signal[-1] = Processor_Code.START;
+    processor_outlet.push_sample(start_signal);
     
     ###########################
     #   Main Processor Loop   #
     ###########################
-    print("[P300_Processor.py]:","Processor running...");
+    console.debug("Processor running...");
     processor_running = True;
     while(processor_running):
-        
-        #TODO: flesh out
-        # Check if the BCI is still connected
-        if(not processor_outlet.have_consumers()):
-            print("?")
-            raise KeyboardInterrupt("meh");
-            
-        
+                
         #############################
         #   Handle stimuli stream   #
         #############################
@@ -733,10 +797,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         # Check if stimulus input was received
         stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
         if(stimulus_input is not None):
-            
-            if(stimulus_input[-1]==123 and stimulus_input[1]==-123):
-                continue;
-            
+                        
             # Appropriately handle the stimulus input
             Handle_Incoming_Stimulus(stimulus_input);
                         
@@ -818,44 +879,53 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     
         pass;    
 
-# Grab an inlet to the EEG stream
-print("[P300_Processor.py]:","Resolving Packaged_EEG stream...");
-inlet_stream = resolve_byprop("source_id", "Cyton_Data_Packager");
-EEG_inlet = StreamInlet(inlet_stream[-1]);
-print("[P300_Processor.py]:","Packaged_EEG stream resolved.");
-#TODO: make this less ghetto
-# Let the Cyton Data Packager know a consumer is connecting
-EEG_inlet.pull_chunk(0.0);
-time.sleep(5);
-# Discard the setup chunk
-EEG_inlet.pull_chunk(0.0);
-
 # Initialize the processor outlet
-print("[P300_Processor.py]:","Opening P300_Processor outlet...");
-info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "float32","P300_Processor");
+console.info("Opening P300_Processor outlet...");
+info = StreamInfo("P300_Processor", "P300_Processor", N_STREAM_ELEMENTS, FLASH_FREQUENCY, "float32","P300_Processor");
 processor_outlet = StreamOutlet(info);
-print("[P300_Processor.py]:","P300_Processor outlet open.");
+console.info("P300_Processor outlet open.");
 
 # Grab an inlet to the BCI stream
-print("[P300_Processor.py]:","Resolving P300_Stimuli stream...");
+console.info("Resolving P300_Stimuli stream...");
 inlet_stream = resolve_byprop("source_id", "BCI_GUI");
 stimuli_inlet = StreamInlet(inlet_stream[-1]);
-print("[P300_Processor.py]:","P300_Stimuli stream resolved.");
+console.info("P300_Stimuli stream resolved.");
+
+# Grab an inlet to the EEG stream
+#TODO: make this non blocking and probably put it after the BCI synchronization part
+console.info("Resolving Packaged_EEG stream...");
+inlet_stream = resolve_byprop("source_id", "Cyton_Data_Packager");
+EEG_inlet = StreamInlet(inlet_stream[-1]);
+console.info("Packaged_EEG stream resolved.");
 
 try:
     
     # Launch the processor
+    #TODO: when adding Start() make Run() argument-less
     Run(processor_outlet, stimuli_inlet, EEG_inlet);
     
 except KeyboardInterrupt:
+    
+    #TODO: wrap all of this and add more appropriate error checking
     
     # Disconnect from inlets
     EEG_inlet.close_stream();
     stimuli_inlet.close_stream();
     
-    # Close the outlet so that it is not discoverable
+    # Send shutdown signal to any consumers of this outlet
+    processor_shutdown_signal = np.empty(N_STREAM_ELEMENTS).astype(int);
+    processor_shutdown_signal[-1] = Processor_Code.PROCESSOR_SHUTDOWN;
+                
+    # Wait for consumers to disconnect
+    #TODO: consider setting a max timeout for this
+    while(processor_outlet.have_consumers()):     
+        processor_outlet.push_sample(processor_shutdown_signal);        
+        # Wait for 100ms, then try again (instead of blocking)
+        # (this brief pause between calls allows for interrupts)
+        time.sleep(0.1);
+                
+    # Completely delete the stimuli outlet
     processor_outlet.__del__();
-    print("[P300_Processor]:","Processor outlet destroyed.");
     
     # Close the program
     print("Killing kernel...");
@@ -863,13 +933,26 @@ except KeyboardInterrupt:
     
 except Exception as e:
     
+    #TODO: wrap all of this and add more appropriate error checking
+    
     # Disconnect from inlets
     EEG_inlet.close_stream();
     stimuli_inlet.close_stream();
     
-    # Close the outlet so that it is not discoverable
+    # Send shutdown signal to any consumers of this outlet
+    processor_shutdown_signal = np.empty(N_STREAM_ELEMENTS).astype(int);
+    processor_shutdown_signal[-1] = Processor_Code.PROCESSOR_SHUTDOWN;
+                
+    # Wait for consumers to disconnect
+    #TODO: consider setting a max timeout for this
+    while(processor_outlet.have_consumers()):     
+        processor_outlet.push_sample(processor_shutdown_signal);        
+        # Wait for 100ms, then try again (instead of blocking)
+        # (this brief pause between calls allows for interrupts)
+        time.sleep(0.1);
+                
+    # Completely delete the stimuli outlet
     processor_outlet.__del__();
-    print("[P300_Processor]:","Processor outlet destroyed.");
     
     # Close the program
     print("Killing kernel...");

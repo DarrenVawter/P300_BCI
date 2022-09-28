@@ -22,12 +22,13 @@ import logging; # print pretty console logs
 
 # Internal Modules
 from BCI_Enumerations import BCI_Mode, Program_Interaction, Stimuli_Code; # pull definitions for enumerated data types
-from BCI_Constants import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DIMENSIONS, N_GUI_OUTPUTS, FLASH_FREQUENCY; # pull constants from header
+from BCI_Constants import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DIMENSIONS, N_STREAM_ELEMENTS, FLASH_FREQUENCY; # pull constants from header
 import BCI_Overlay; # run screen overlay using P300 speller
 import BCI_Keyboard; # run keyboard using P300 speller 
 from FTDI_Handler import FTDI_Handler; # interact with UM232R FTDI device
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
 
+#TODO: Start() docstring
 def Start():    
 
 ###############################
@@ -41,7 +42,7 @@ def Start():
         #   Destroy the processor inlet   #
         ###################################
         
-        console.debug("Shutting down...");
+        console.critical("Shutting down BCI...");
         
         try:
             
@@ -78,13 +79,13 @@ def Start():
             if(stimuli_outlet is not None):
                 
                 # Send shutdown signal to any consumers of this outlet
-                BCI_shutdown_signal = np.zeros(N_OUTPUTS+1).astype(int);
+                BCI_shutdown_signal = np.empty(N_STREAM_ELEMENTS).astype(int);
                 BCI_shutdown_signal[-1] = Stimuli_Code.BCI_SHUTDOWN;
-                stimuli_outlet.push_sample(BCI_shutdown_signal);
                 
                 # Wait for consumers to disconnect
                 #TODO: consider setting a max timeout for this
-                while(stimuli_outlet.have_consumers()):             
+                while(stimuli_outlet.have_consumers()):    
+                    stimuli_outlet.push_sample(BCI_shutdown_signal);         
                     # Wait for 100ms, then try again (instead of blocking)
                     # (this brief pause between calls allows for interrupts)
                     time.sleep(0.1);
@@ -154,7 +155,7 @@ def Start():
             
             raise e;
             
-        console.critical("Shutdown complete.");
+        console.critical("BCI shutdown complete.");
         
         # End of Shutdown_Controller
         pass;
@@ -198,7 +199,7 @@ def Start():
         #TODO: to minimize the amount of data that is being streamed, package the
         #      flash array into as few bytes as possible insteading each bit as an int16
         console.info("Opening P300_Stimuli outlet...");
-        info = StreamInfo("P300_Stimuli", "P300_Stimuli", N_GUI_OUTPUTS, FLASH_FREQUENCY, "int16","BCI_GUI");
+        info = StreamInfo("P300_Stimuli", "P300_Stimuli", N_STREAM_ELEMENTS, FLASH_FREQUENCY, "int16","BCI_GUI");
         stimuli_outlet = StreamOutlet(info);
         console.info("P300_Stimuli outlet opened.");
         
@@ -301,7 +302,7 @@ def Start():
         # An exception was raised, properly shutdown the BCI
         Shutdown_Controller();
     
-    except (Exception, SystemExit, GeneratorExit) as e:
+    except Exception as e:
     
         console.error("Unhandled error raised.");
         
@@ -315,16 +316,9 @@ def Start():
     
         # Main controller loop has exited, properly shutdown the BCI
         Shutdown_Controller();
-        
-
-
-
-
-
 
 #TODO: call this from a file that independently starts all 3 processes          
-Start();
-    
+Start();  
 
 
 

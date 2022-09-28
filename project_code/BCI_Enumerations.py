@@ -8,7 +8,7 @@ This module is a header for the program's enumerated data types.
 from enum import IntEnum; # Allow for integer enumeration types
 
 ###########################
-#   Enumerate BCI Modes   #
+#   Enumerate BCI modes   #
 ###########################
 class BCI_Mode(IntEnum):
 
@@ -27,13 +27,13 @@ class BCI_Mode(IntEnum):
         YOUTUBE_OVERLAY = 14;
     """    
     
-#########################################
-#   Enumerate BCI Interaction Options   #
-#########################################
-class BCI_Interaction(IntEnum):
+########################################
+#   Enumerate PC interaction options   #
+########################################
+class PC_Interaction(IntEnum):
     
     ##########################
-    #   Mouse Interactions   #
+    #   Mouse interactions   #
     ##########################
     # Left-click the mouse at the center/selection of the current overlay
     CLICK = 0;
@@ -43,7 +43,7 @@ class BCI_Interaction(IntEnum):
     RIGHT_CLICK = 2;
     
     #############################
-    #   Keyboard Interactions   #
+    #   Keyboard interactions   #
     #############################
     # Press the page up button
     PAGE_UP = 3;
@@ -53,55 +53,72 @@ class BCI_Interaction(IntEnum):
     TAB = 5;
     # Press enter
     ENTER = 6;
-    
-#############################################
-#   Enumerate Overlay Interaction Options   #
-#############################################
-class Overlay_Interaction(IntEnum):
-        
-    #############################
-    #   Overlay Interactions   #
-    #############################
-    # Revert to the previous level of magnification
-    REVERT_MAGNIFICATION = 0;
-    
-#############################################
-#   Enumerate Speller Interaction Options   #
-#############################################
-class Speller_Interaction(IntEnum):
-    
-    # Close keyboard
-    CLOSE_KEYBOARD = 0;
-       
+           
 #############################################
 #   Enumerate Program Interaction Options   #
 #############################################
 class Program_Interaction(IntEnum):
 
-    ############################
-    #   Program Interactions   #
-    ############################
     # Exit the program
     EXIT = 0;   
+    
+    # Revert the overlay to the previous level of magnification
+    REVERT_MAGNIFICATION = 10;
+    
+    # Close keyboard interface
+    CLOSE_KEYBOARD = 20;
         
-#####################################
-#   Enumerate stimuli trial codes   #
-#####################################
+########################################
+#   Enumerate processor stream codes   #
+########################################
+class Processor_Code(IntEnum):
+    
+    # Stream data is a cell classification, cell values are one hot as follows:
+        # 0 --> cell was not flashed
+        # 1 --> cell was flashed
+    CLASSIFICATION = 0; 
+    # Stream data is an update to cell probabilities, cell values are the current probabilities
+    PROBABILITY_UPDATE = 1;
+    
+    # Stream data is telling the interface to start
+    START = -1;
+    # Stream data is telling the interface to restart
+    RESTART = -2;
+    # Stream data is announcing that the processor is shutting down
+    PROCESSOR_SHUTDOWN = -3;
+
+######################################
+#   Enumerate stimuli stream codes   #
+######################################
 class Stimuli_Code(IntEnum):
     
-    # Trial is a training trial
-    # code --> target_id
-    # Trial is not the start of a new classification and is a not a sync trial
-    NON_SYNC = -1;
-    # Trial is not the start of a new classification but is a sync trial
-    SYNC = -2;
-    # Trial is the start of a new classification but is a not a sync trial
-    NON_SYNC_START = -3;
-    # Trial is the start of a new classification and is a sync trial
-    SYNC_START = -4;
-    # Data is not trial data, BCI is shutting down
-    BCI_SHUTDOWN = -5;
+    # Stream data is a training trial, cell values are as follows:  
+        # 0 --> cell was not flashed, cell is not the target of the trial
+        # 1 --> cell was flashed, cell is not the target of the trial
+        # 2 --> cell was not flashed, cell is the target of the trial
+        # 3 --> cell was flashed, cell is the target of the trial  
+    TRAINING = 0;
+    
+    # For all of the following 4 codes, cell values are one hot as follows:
+        # 0 --> cell was not flashed
+        # 1 --> cell was flashed
+    # Stream data is not the start of a new classification and is a not a sync trial
+    NON_SYNC = 1;
+    # Stream data is not the start of a new classification but is a sync trial
+    SYNC = 2;
+    # Stream data is the start of a new classification but is a not a sync trial
+    NON_SYNC_START = 3;
+    # Stream data is the start of a new classification and is a sync trial
+    SYNC_START = 4;
 
+    # Stream data is requesting start from the processor
+    START = -1;
+    # Stream data is requesting a restart from the processor
+    RESTART = -2;
+    # Stream data is announcing that the BCI is shutting down
+    BCI_SHUTDOWN = -3;
+    # Stream data is announcing that the interface is shutting down
+    INTERFACE_SHUTDOWN = -4;
 
 
 

@@ -20,7 +20,7 @@ class Logging_Formatter(logging.Formatter):
     magenta_underline = "\x1b[4m";
         
     reset = "\x1b[0m";
-    format = "[%(name)s]: %(message)s\n\t\t%(asctime)s @ (%(lineno)d)";
+    format = "\n%(asctime)s @ (%(lineno)d)\n\t[%(name)s]: %(message)s";
 
     FORMATS = {
         logging.DEBUG: green + format + reset,

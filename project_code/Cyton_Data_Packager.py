@@ -135,11 +135,20 @@ def start():
             
         # If there is currently a consumer
         if(stream_outlet.have_consumers()):
+            
+            # If this is the first consumer that has been found
             if(waiting_for_consumer):
                 print("Consumer joined.");
-            # Unblock data collection
+                
+            # Unblock data storage
             waiting_for_consumer = False;
             
+        # Check if there are currently no consumers, but there previously was
+        elif(not waiting_for_consumer):
+            
+            # Init shutdown            
+            raise KeyboardInterrupt("Consumers disconnected");
+                        
         # Pull sample from the 8 EEG channels
         current_sample_EEG = np.array(sample.channels_data)*SCALE_FACTOR_EEG;
         
@@ -274,13 +283,7 @@ def start():
             # Initialized to start time start chunk timer from the start
             last_chunk_broadcast_time = time.time();
             
-            return;
-            
-        # Check if a consumer connected, then disconnected
-        elif(not stream_outlet.have_consumers()):
-            
-            # Init shutdown            
-            raise KeyboardInterrupt("Consumers disconnected");
+            return;            
             
         # Append the packaged sample to the current chunk
         chunk_to_send = np.vstack((chunk_to_send, packaged_sample));
@@ -295,10 +298,7 @@ def start():
             # Send the chunk
             send_chunk();
             
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-                
-    print("Waiting for consumer...");
-        
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#                       
     # Start the board stream with callback
     cyton.start_stream(package_sample);
         

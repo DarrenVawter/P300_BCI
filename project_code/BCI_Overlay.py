@@ -11,13 +11,14 @@ import pygame; # display to the screen and play sounds
 import d3dshot; # grab screen pixels
 import pyautogui; # virtualize keyboard & mouse control
 from math import floor, ceil;
+import logging; # print pretty console logs
 
 # Internal Modules
-from BCI_Enumerations import BCI_Interaction, Overlay_Interaction, Program_Interaction, Stimuli_Code; # definitions for enumerated data types
-
+from BCI_Enumerations import Program_Interaction, PC_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
+from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
+from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 #TODO: swap these out (later, because it will generate annoying warnings)
 #from BCI_Constants import *; # pull constants from header
-from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_GUI_OUTPUTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
@@ -33,6 +34,16 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     a_sum = 0;
     b_sum = 0;
     #~~~~~~~~~~~~~~~~~~~~~~~~~~
+            
+    #TODO: wrap this
+    # Create a console logger for pretty formatting
+    console = logging.getLogger("BCI_Overlay.py");
+    console.setLevel(logging.DEBUG);
+    if(console.hasHandlers()):
+        console.handlers.clear();
+    ch = logging.StreamHandler();
+    ch.setFormatter(Logging_Formatter());
+    console.addHandler(ch);
     
     ###############################
     #   Define Helper Functions   #
@@ -252,7 +263,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         exceptions:
             [none]
     
-        --> Delete/destroy/close/disable relevant variable and objects
+        --> Delete/destroy/close/disable relevant variables and objects
         
         --> Return
         
@@ -261,9 +272,20 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
 
         nonlocal screen_grabber, overlay_running;
 
+        console.debug("Shutting down interface...");
+        
+        # Announce that the overlay interface is shutting down
+        console.info("Announcing shutdown.");
+        shutdown_signal = np.empty(N_STREAM_ELEMENTS).astype(int);
+        shutdown_signal[-1] = Stimuli_Code.INTERFACE_SHUTDOWN;
+        stimuli_outlet.push_sample(shutdown_signal);
+
+        #TODO: error catch more finely
+        #TODO: maaayyybbbbeeee consider logging these
         del screen_grabber;
-        overlay_running = False;
-        print("[BCI_Overlay.py]:","Shutting down...");
+        overlay_running = False;        
+        
+        console.debug("Interface shutdown complete.");
         
         # End of Shutdown_Overlay()
         pass;
@@ -349,31 +371,55 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     # Randomized indices to reference the flash images
     flash_image_indices = np.arange(N_FLASH_IMAGES);
         
-    # Track whether or not the current trial is the start of a new trial
+    # Track whether or not the current trial is the start of a new classification
     start_new_classification = False;
     
-    dummy_signal = np.zeros(N_OUTPUTS+1).astype(int);
-    dummy_signal[-1] = 123;
-    dummy_signal[1] = -123;
+    ########################################
+    #   Synchronize start with processor   #
+    ########################################
     
-    # Wait for processor to connect
-    print("waiting for processor")
+    # Define start request signal to send until processor acknowledges receipt by signaling back to start
+    start_request = np.empty(N_STREAM_ELEMENTS).astype(int);
+    start_request[-1] = Stimuli_Code.START;
+    
+    # Wait for processor to acknowledge the connection by requesting start
+    #TODO: consider adding a maximum timeout to this
+    console.info("Waiting to receive start signal from processor...");
     while(True):
-        processor_input, _ = processor_inlet.pull_sample(0.0);
+        
+        # Broadcast the start request
+        stimuli_outlet.push_sample(start_request);    
+            
+        # Check for new input from the processor
+        # (Waiting for input 100ms at most, then trying again to allow for interrupts) 
+        processor_input, _ = processor_inlet.pull_sample(0.1);
         if(processor_input is not None):
-            if(processor_input[-1] == N_OUTPUTS):
+
+            # Verify that the input is a start signal
+            if(processor_input[-1] == Processor_Code.START):
+                                
+                # Set flag to show that next trial is the start of a new classification
                 start_new_classification = True;
                 break;
+                
+            # Else, the received signal was not a start
+            else:
+                
+                #TODO: implement raising/handling an error since we should only expect a start signal here
+                #TODO: ^----? maybe ?
+                console.warning("Received processor code",Processor_Code(processor_input[-1]),"when start code was expected.");
+            
+        # Else, attempt to again alert the processor that the BCI is ready & waiting
         else:
-            stimuli_outlet.push_sample(dummy_signal);
-            print("sent dummy")
-            time.sleep(0.25);        
-        
-    print("processor connected")
+                        
+            # Wait for 100ms to reserve resources
+            #TODO: consider adding this to pull_sample as a 100ms block instead
+            time.sleep(0.1);    
         
     #########################
     #   Main Overlay Loop   #
     #########################
+    console.debug("Start signal received from processor.");  
     overlay_running = True;
     while(overlay_running): 
 
@@ -381,44 +427,46 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         # Check if the processor is still connected
         if(not stimuli_outlet.have_consumers()):
             Shutdown_Overlay();
+            #TODO: differentiate this interaction
             return (Program_Interaction.EXIT,None);
         
         #############################
         #   Handle external input   #
         #############################
                         
+        #TODO: wrap this
+        #TODO: wrap this so hard
+        
         # Check LSL for input
         processor_input, _ = processor_inlet.pull_sample(0.0);
         if(processor_input is not None):
-        
-            if(processor_input[-1]==12345 and processor_input[1]==-12345):
-                continue;
-                
+                        
             # Convert the input to a np array
             processor_input = np.array(processor_input);
             
-            # Grab the flag from the end of the array
-            processor_flag = processor_input[-1];
+            # Grab the processor code from the end of the array
+            processor_code = Processor_Code(processor_input[-1]);
             
-            print(processor_flag);
-                
-            # Check if input is a tile classification
-            if(processor_flag < 0):
+            # Check if input is a probability update
+            if(processor_code == Processor_Code.PROBABILITY_UPDATE):
             
-                # Typecheck and convert the flag to the classification id
-                if(processor_flag.is_integer()):
-                    classification_id = int(-(processor_flag+1));
-                else:
-                    raise TypeError("Received non-integer classification ID from processor.");
-                                    
+                # Update tile probabilities
+                tile_probabilities = processor_input;                                
+            
+            # Check if processor_code is a tile classification
+            elif(processor_code == Processor_Code.CLASSIFICATION):
+                                                
+                # Find the id of the classified tile
+                classification_id = np.where(processor_input == 1)[0][0];
+                                
                 # Check if classified tile is an overlay control option
                 if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
                     # Convert control to overlay interaction
-                    overlay_interaction = Overlay_Interaction(classification_id%N_TILE_COLUMNS);
+                    program_interaction = Program_Interaction(classification_id%N_TILE_COLUMNS+10);
                     
                     # Check if the user zoomed out
-                    if(overlay_interaction == Overlay_Interaction.REVERT_MAGNIFICATION):
+                    if(program_interaction == Program_Interaction.REVERT_MAGNIFICATION):
                                             
                         # Revert magnification to full screen
                         #TODO: store the last zoom level and revert to that instead    
@@ -428,46 +476,46 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
 
                     # Convert control to BCI interaction
-                    BCI_interaction = BCI_Interaction(floor(classification_id/N_TILE_COLUMNS));
+                    PC_interaction = PC_Interaction(floor(classification_id/N_TILE_COLUMNS));
                     
                     # Check if the user left clicked
-                    if(BCI_interaction == BCI_Interaction.CLICK):
+                    if(PC_interaction == PC_Interaction.CLICK):
                         
                         # Handle the left click
                         Handle_Click("left");
                                                 
                     # Check if the user double clicked
-                    elif(BCI_interaction == BCI_Interaction.DOUBLE_CLICK):  
+                    elif(PC_interaction == PC_Interaction.DOUBLE_CLICK):  
                         
                         # Handle the double click
                         Handle_Click("double");
                         
                     # Check if the user right clicked
-                    elif(BCI_interaction == BCI_Interaction.RIGHT_CLICK):    
+                    elif(PC_interaction == PC_Interaction.RIGHT_CLICK):    
                         
                         # Handle the right click
                         Handle_Click("right");  
                         
                     # Check if the user pressed page up
-                    elif(BCI_interaction == BCI_Interaction.PAGE_UP):  
+                    elif(PC_interaction == PC_Interaction.PAGE_UP):  
                         
                         # Press the page up key
                         pyautogui.press("pageup");  
                         
                     # Check if the user pressed page down
-                    elif(BCI_interaction == BCI_Interaction.PAGE_DOWN): 
+                    elif(PC_interaction == PC_Interaction.PAGE_DOWN): 
                         
                         # Press the page down key
                         pyautogui.press("pagedown");  
                         
                     # Check if the user tabbed
-                    elif(BCI_interaction == BCI_Interaction.TAB):  
+                    elif(PC_interaction == PC_Interaction.TAB):  
                         
                         # Press the tab key
                         pyautogui.press("tab");  
                         
                     # Check if the user pressed enter
-                    elif(BCI_interaction == BCI_Interaction.ENTER):   
+                    elif(PC_interaction == PC_Interaction.ENTER):   
                         
                         # Press the enter key 
                         pyautogui.press("enter");                                     
@@ -487,27 +535,33 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     pyautogui.keyUp('alt');
                     
                     # Move the mouse to the center of the mirror to show where a click would be
-                    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
+                    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH/2,OVERLAY_HEIGHT/2);
                     
                 # Flag to start a new classification
                 start_new_classification = True;
                 
             # Check if input is a restart request
-            elif(processor_flag == N_OUTPUTS):
-                
-                print("?");
-                
+            elif(processor_code == Processor_Code.RESTART):
+                                
                 # Reset tile probabilities
                 tile_probabilities = np.ones((N_TILES,1))/N_TILES;
                 
                 # Flag to start a new classification
                 start_new_classification = True;
                 
+            # Check if the processor is shutting down
+            elif(processor_code == Processor_Code.PROCESSOR_SHUTDOWN):
+           
+                # Shutdown the overlay and flag the controller to close the BCI
+                Shutdown_Overlay();
+                #TODO: differentiate this interaction
+                return (Program_Interaction.EXIT,None);
+            
             # Else, input is updated probabilities
             else:
-            
-                # Update tile probabilities
-                tile_probabilities = processor_input;
+                
+                #TODO: custom exception
+                raise RuntimeError("Unexpected exception");
                         
         ##########################
         #   Handle flash group   #
@@ -519,17 +573,23 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Pick the next flash group
             Choose_Flash_Tiles();
                         
-            # Convert flash data to 1 hot array with -1 for unused cells
-            stimuli_data = np.zeros(N_OUTPUTS+1).astype(int);
-            stimuli_data[N_TILES:N_OUTPUTS] = -1;
+            # Form output array
+                # -1 --> unused cell
+                # 0 --> used cell, not flashed this trial
+                # 1 --> used cell, flashed this trial
+            # Initialize output array to all zeros
+            stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
+            # Set unused cells to -1
+            stimuli_data[N_TILES:] = -1;
+            # Set flashed cells to 1
             stimuli_data[current_flash_group] = 1;
             
             #TODO: add DRBG back in to determine if the trial was a sync trial
             # For now, call any trial that flashes tile 0 a sync trial
             BCI_sync_code = stimuli_data[0];
             
-            # Append the trial's sync code to the array & update UM232R
-            
+            # Append the trial's sync code to the array and send relevant data to processor & UM232R
+                        
             # Check if the trial is the first trial of a new classification
             if(start_new_classification):
                 
@@ -673,6 +733,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         for event in pygame.event.get():
            if(event.type == pygame.QUIT):      
                Shutdown_Overlay();
+               #TODO: differentiate this interaction
                return (Program_Interaction.EXIT,None);
                
         #TODO: remove this   
@@ -688,8 +749,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             print("~~~~~~~~~~~~~~~~");
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        # End of Main overlay loop
-        pass;
+    # End of Main overlay loop
+    pass;
     
     
     

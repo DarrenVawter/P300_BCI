@@ -65,8 +65,7 @@ SAMPLING_FREQUENCY = 250;
 DEFAULT_THRESHOLD = 0.95;
     
 # Caclulate the number of outlets in the processor and stimuli streams
-N_PROCESSOR_OUTPUTS = max(N_TILES,N_KEYS);
-N_GUI_OUTPUTS = N_PROCESSOR_OUTPUTS + 1;
+N_STREAM_ELEMENTS = max(N_TILES,N_KEYS) + 1;
 
 # Amount of time, in seconds, to present each stimulus for
 FLASH_DURATION = 0.1;
