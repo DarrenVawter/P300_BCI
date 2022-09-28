@@ -20,9 +20,10 @@
 import time;
 import numpy as np;
 from scipy import signal as Signal;
+from scipy.io import loadmat as LoadMAT;
+from scipy.stats import multivariate_normal as MVN;
 from math import ceil;
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
-
 
 # Internal Modules
 from BCI_Enumerations import Stimuli_Code;
@@ -33,6 +34,9 @@ from BCI_Constants import N_OUTPUTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLAS
 #############################
 def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         
+    #TODO: update & move this
+    NON_TARGET_MULTIPLIER = 100/10 - 1;
+    
     ###############################
     #   Define Helper Functions   #
     ###############################
@@ -77,6 +81,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
             # Flag for shutdown
             processor_running = False;
             print("[P300_Processor.py]:","Shutting down...");  
+            raise KeyboardInterrupt("mehx2");
             
                     
         # Append the stimulus input to the stimulus data
@@ -117,8 +122,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
             --> Apply the cascade filter to the chunk and track the filter states
             
         --> Return the EEG chunk
-            
-        
+                    
     """
     def Filter_Chunk(EEG_chunk):
         
@@ -134,8 +138,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
             
         # End of Filter_Chunk
         return EEG_chunk;
-        
-        
+                
     """
     
     Handle_Incoming_Stimulus()
@@ -184,14 +187,33 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     """
     def Handle_Incoming_EEG_Chunk(EEG_chunk):
         
-        nonlocal EEG_samples, EEG_sample_index, processor_running;
+        nonlocal EEG_samples, EEG_sample_index, processor_running;#, live_EEG_index;
         
         # Filter the chunk
         EEG_chunk = Filter_Chunk(EEG_chunk);
-            
+                    
         # Grab the size of the chunk
         chunk_size = len(EEG_chunk);
             
+        #TODO: remove
+        #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Live view
+        """
+        if(live_EEG_index + chunk_size < N_LIVE_SAMPLES):
+            live_EEG[live_EEG_index:live_EEG_index+chunk_size] = EEG_chunk[:,3];
+            live_EEG_index = live_EEG_index+chunk_size;
+        else:
+            live_EEG[live_EEG_index:] = EEG_chunk[:N_LIVE_SAMPLES-live_EEG_index,3];
+            live_EEG[:live_EEG_index+chunk_size-N_LIVE_SAMPLES] = EEG_chunk[N_LIVE_SAMPLES-live_EEG_index:,3];
+            live_EEG_index = live_EEG_index+chunk_size-N_LIVE_SAMPLES-1;
+            
+        plt.ylim([np.min(live_EEG)-1,np.max(live_EEG)+1]);
+        plt.xlim([0,5]);
+        plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), live_EEG);
+        plt.show();
+        """
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+        
         # Grab the indices of the first trial start, if any exist
         trial_start_index = np.argmax(EEG_chunk[:,-1]!=0);
                 
@@ -290,7 +312,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
                                      
             print(EEG_epoch_index);
             print(EEG_samples[:200,-1]);
-            print(stimuli_trial_data[:30,-1]);
+            print(stimuli_trial_data[EEG_epoch_index-4:EEG_epoch_index+5,-1]);
               
             # Raise error
             raise RuntimeError("Cyton/BCI desynchronization detected.");
@@ -434,45 +456,106 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     # Calculate the correlation coefficients
     def Calculate_Correlation_Coefficients(normalized_epoch):
         
-        #//np.correlate(x,y,"full");
+        nonlocal mwms_classifer;
         
-        return [1,2,3];
+        correlation_coefficients = np.zeros(CORRELATION_DEGREE);
+        
+        last_tier_data = normalized_epoch;
+        
+        classifier_width = SAMPLES_PER_EPOCH;
+        
+        for degree in range(CORRELATION_DEGREE):
+            
+            tier_data = np.zeros((classifier_width*2-1,N_EEG_CHANNELS));
+        
+            correlation_coefficient = 0;
+        
+            for channel in range(N_EEG_CHANNELS):
+                
+                tier_data[:,channel] = np.correlate(mwms_classifer[degree,:classifier_width,channel],last_tier_data[:,channel],"full");
+                
+                correlation_coefficient += tier_data[classifier_width,channel];
+        
+            correlation_coefficients[degree] = correlation_coefficient / N_EEG_CHANNELS;
+            
+            classifier_width *= 2;
+            classifier_width -= 1;
+            
+            last_tier_data = tier_data
+            last_tier_data[:classifier_width,:] = last_tier_data[:classifier_width,:] / np.sum(last_tier_data[:classifier_width,:],0);
+        
+        return correlation_coefficients;
     
     # Calculate trial probability
     def Calculate_Trial_Probability(correlation_coefficients):         
-        
+
         # Generate an independent probability that this trial was a non-target trial
+        trial_non_target_probability = non_target_mvn.pdf(correlation_coefficients);
+        trial_non_target_probability *= NON_TARGET_MULTIPLIER;
         
         # Generate an independent probability that this trial was a target trial
+        trial_target_probability = target_mvn.pdf(correlation_coefficients);
         
         # Normalize the generated probabilities
+        p_space = trial_target_probability + trial_non_target_probability;
+        #trial_non_target_probability /= p_space; # = 1-target
+        trial_target_probability /= p_space;
         
-        return 0.5;
+        return trial_target_probability;
     
     # Update cell probabilities
     def Update_Probabilities(trial_probability): 
         
+        nonlocal cell_probabilities;
+        
         # Update the cell probabilities according to the probability of this trial
+        unused_cells = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == -1);
+        
+        flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 1)
+        n_per_flash = len(flashed);
+        
+        not_flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 0);
+        n_not_flashed = len(not_flashed);
+        
+        cell_probabilities[unused_cells] = 0;
+        
+        old_probabilities = cell_probabilities[:];
+        
+        cell_probabilities[flashed] = cell_probabilities[flashed] * trial_probability/n_per_flash;
+        cell_probabilities[not_flashed] = cell_probabilities[not_flashed] * (1-trial_probability)/n_not_flashed;
+        cell_probabilities[:] = cell_probabilities[:]/np.sum(cell_probabilities);
         
         # Weight previous probabilities
+        cell_probabilities[:] = old_probabilities[:] * 0.1 + cell_probabilities[:] * 0.9;
         
         pass;
         
     # Broadcast classification status
     def Broadcast_Classification_Status():
         
+        nonlocal waiting_start_new_classification;
+        
         # Find what is currently the most probable cell
+        most_probable_cell = np.argmax(cell_probabilities);
+        
+        print(cell_probabilities[most_probable_cell]);
         
         # Check if the most probable cell is above its threshold
-        
-            # Broadcast the classification result
-            # (offset by 1 then multiply by -1 as per scheme)                
-            
+        if(cell_probabilities[most_probable_cell] >= cell_thresholds[most_probable_cell]):
+                    
             # Flag that the processor is waiting for the BCI to start streaming current data
+            waiting_start_new_classification = True;
+            
+            # Broadcast the classification result
+            # (offset by 1 then multiply by -1 as per scheme)           
+            res = -most_probable_cell * np.ones(N_OUTPUTS);
+            processor_outlet.push_sample(res);
         
         # Else, a classification is not ready
+        else:
         
             # Broadcast the current probabilities
+            processor_outlet.push_sample(cell_probabilities);
                 
         pass;
         
@@ -551,6 +634,20 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     #TODO: trim this in accordance with total_trials_received to prevent them from becoming annoyingly large
     #TODO: detect large gaps between this and total_trials_received (to allow one to catch up)
     
+    #TODO: remove this
+    # Live view    
+    """
+    live_EEG_index = 0;
+    N_LIVE_SAMPLES = SAMPLING_FREQUENCY*5;
+    live_EEG = np.zeros(N_LIVE_SAMPLES);
+    
+    import matplotlib.pyplot as plt;    
+    plt.ylim([np.min(live_EEG)-1,np.max(live_EEG)+1]);
+    plt.xlim([0,5]);
+    plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), live_EEG);
+    plt.show();
+    """
+    
     ####################################
     #   Initialize stimuli variables   #
     ####################################
@@ -567,18 +664,17 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     #TODO: trim this in accordance with total_epochs_received to prevent them from becoming annoyingly large
     #TODO: detect large gaps between this and total_epochs_received (to allow one to catch up)
         
-    ########################################
-    #   Initialize statistical variables   #
-    ########################################
-        
-    # Declare the correlation statistics
-    non_target_means = np.empty((CORRELATION_DEGREE,1));
-    non_target_stds = np.empty((CORRELATION_DEGREE,1));
-    non_target_cov = np.empty((CORRELATION_DEGREE,1));
-    target_means = np.empty((CORRELATION_DEGREE,1));
-    target_stds = np.empty((CORRELATION_DEGREE,1));
-    target_cov = np.empty((CORRELATION_DEGREE,1));
+    #################################################
+    #   Load pretrained classifier and statistics   #
+    #################################################
+    mat_dict = LoadMAT("classifier_data.mat");
     
+    mwms_classifer = np.array(mat_dict['mwms_classifier']);
+    non_target_means = np.reshape(np.array(mat_dict['non_target_means']),(CORRELATION_DEGREE));
+    non_target_cov = np.array(mat_dict['non_target_cov']);
+    target_means = np.reshape(np.array(mat_dict['target_means']),(CORRELATION_DEGREE));
+    target_cov = np.array(mat_dict['target_cov']);
+            
     # Initialize cell probabilities
     cell_probabilities = np.ones(N_OUTPUTS)/N_OUTPUTS;
     
@@ -586,9 +682,30 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     #TODO: initialize dynamically
     cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_OUTPUTS);
     
+    non_target_mvn = MVN(mean = non_target_means, cov = non_target_cov);
+    target_mvn = MVN(mean = target_means, cov = target_cov);
+    
     ##################################
     #   Synchronize start with BCI   #
     ##################################
+            
+    dummy_signal = np.zeros(N_OUTPUTS).astype(int);
+    dummy_signal[-1] = 12345;
+    dummy_signal[1] = -12345;
+    
+    # Wait for BCI to connect
+    print("waiting for processor")
+    while(True):
+        stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
+        if(stimulus_input is not None):
+            break;
+        else:
+            processor_outlet.push_sample(dummy_signal);
+            print("sent dummy")
+            time.sleep(0.25);        
+        
+    print("BCI connected")
+        
         
     # Send restart request to BCI
     restart_signal = np.zeros(N_OUTPUTS).astype(int);
@@ -602,6 +719,13 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     processor_running = True;
     while(processor_running):
         
+        #TODO: flesh out
+        # Check if the BCI is still connected
+        if(not processor_outlet.have_consumers()):
+            print("?")
+            raise KeyboardInterrupt("meh");
+            
+        
         #############################
         #   Handle stimuli stream   #
         #############################
@@ -609,10 +733,13 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
         # Check if stimulus input was received
         stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
         if(stimulus_input is not None):
-        
+            
+            if(stimulus_input[-1]==123 and stimulus_input[1]==-123):
+                continue;
+            
             # Appropriately handle the stimulus input
             Handle_Incoming_Stimulus(stimulus_input);
-            
+                        
         #########################
         #   Handle EEG stream   #
         #########################
@@ -648,7 +775,7 @@ def Run(processor_outlet, stimuli_inlet, EEG_inlet):
     
             # Check if this epoch is the first trial of a new classification
             if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
-            
+                        
                 # Handle classification start
                 Start_New_Classification();
                 
@@ -705,7 +832,7 @@ EEG_inlet.pull_chunk(0.0);
 
 # Initialize the processor outlet
 print("[P300_Processor.py]:","Opening P300_Processor outlet...");
-info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "int16","P300_Processor");
+info = StreamInfo("P300_Processor", "P300_Processor", N_OUTPUTS, 125, "float32","P300_Processor");
 processor_outlet = StreamOutlet(info);
 print("[P300_Processor.py]:","P300_Processor outlet open.");
 

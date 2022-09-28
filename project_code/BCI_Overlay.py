@@ -352,25 +352,55 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     # Track whether or not the current trial is the start of a new trial
     start_new_classification = False;
     
+    dummy_signal = np.zeros(N_OUTPUTS+1).astype(int);
+    dummy_signal[-1] = 123;
+    dummy_signal[1] = -123;
+    
+    # Wait for processor to connect
+    print("waiting for processor")
+    while(True):
+        processor_input, _ = processor_inlet.pull_sample(0.0);
+        if(processor_input is not None):
+            if(processor_input[-1] == N_OUTPUTS):
+                start_new_classification = True;
+                break;
+        else:
+            stimuli_outlet.push_sample(dummy_signal);
+            print("sent dummy")
+            time.sleep(0.25);        
+        
+    print("processor connected")
+        
     #########################
     #   Main Overlay Loop   #
     #########################
     overlay_running = True;
     while(overlay_running): 
+
+        #TODO: flesh out
+        # Check if the processor is still connected
+        if(not stimuli_outlet.have_consumers()):
+            Shutdown_Overlay();
+            return (Program_Interaction.EXIT,None);
         
         #############################
         #   Handle external input   #
         #############################
-                
+                        
         # Check LSL for input
         processor_input, _ = processor_inlet.pull_sample(0.0);
         if(processor_input is not None):
         
+            if(processor_input[-1]==12345 and processor_input[1]==-12345):
+                continue;
+                
             # Convert the input to a np array
             processor_input = np.array(processor_input);
             
             # Grab the flag from the end of the array
             processor_flag = processor_input[-1];
+            
+            print(processor_flag);
                 
             # Check if input is a tile classification
             if(processor_flag < 0):
@@ -464,6 +494,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 
             # Check if input is a restart request
             elif(processor_flag == N_OUTPUTS):
+                
+                print("?");
                 
                 # Reset tile probabilities
                 tile_probabilities = np.ones((N_TILES,1))/N_TILES;

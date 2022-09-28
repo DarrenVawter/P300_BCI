@@ -59,7 +59,7 @@ def start():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     
     # A chunk of several data samples waiting to be sent
-    chunk_to_send = np.empty([1,9]);
+    chunk_to_send = np.zeros([1,9]);
     
     # The time at which the last chunk was broadcasted over LSL
     # Initialized to start time start chunk timer from the start
@@ -73,6 +73,13 @@ def start():
         nonlocal chunk_to_send;
         nonlocal last_chunk_broadcast_time;
         
+        out = np.array(np.where(chunk_to_send[1:,8]>0));
+        out = out+1;
+        print(np.shape(out))
+        print(np.shape(out)[1])
+        if(np.shape(out)[1]>0):
+            print(chunk_to_send[out,8]);
+        
         # Broadcast chunk over LSL outlet
         stream_outlet.push_chunk(chunk_to_send[1:,:].tolist());
         print("Chunk sent~~~~~~~~~~~~");
@@ -81,7 +88,7 @@ def start():
         last_chunk_broadcast_time = time.time();
     
         # Reset chunk back to empty-state
-        chunk_to_send = np.empty([1,9])
+        chunk_to_send = np.zeros([1,9])
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     
@@ -225,7 +232,7 @@ def start():
                 print("Sync flipped", trial_index-1, "sync",n_samples_since_last_trial);
             
                 # The previous flip was marked wrong; fix it
-                bad_stamp_ind = np.argmax(chunk_to_send[:,8]);
+                bad_stamp_ind = np.where(chunk_to_send[:,8]==trial_index-1);
                 chunk_to_send[bad_stamp_ind,8] *= -1;
                 print("Went back and fixed previous trial.");
                 
@@ -259,7 +266,7 @@ def start():
             n_samples_since_last_trial = 0;
             
             # A chunk of several data samples waiting to be sent
-            chunk_to_send = np.empty([1,9]);
+            chunk_to_send = np.zeros([1,9]);
             
             time.sleep(0.1);
             
@@ -316,6 +323,23 @@ except KeyboardInterrupt:
     # Close the program
     print("Killing kernel...");
     time.sleep(1);
+
+except Exception as e:
+    
+    # Disconnect the Cyton to release the COM port
+    if(isinstance(cyton, OpenBCICyton)):
+        cyton.disconnect();
+        print("Disconnected from COM port.");
+    
+    # Close the stream so that it is not discoverable
+    stream_outlet.__del__();
+    print("Stream outlet destroyed.");
+    
+    # Close the program
+    print("Killing kernel...");
+    time.sleep(1);
+    
+    raise e;
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
