@@ -6,6 +6,7 @@ This module displays a screen overlay running a P300 speller to the user.
 """
 
 # External Modules
+import time;
 import numpy as np; # fast arrays&manipulation
 import pygame; # display to the screen and play sounds
 import d3dshot; # grab screen pixels
@@ -24,17 +25,7 @@ from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CA
 #   Dislpay the screen overlay and run the P300 Speller   #
 ###########################################################
 def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
-        
-    #TODO: remove this    
-    # Track framerate/item performance
-    import time;
-    last_time = time.time();
-    n_frames = 0;
-    frame_time = 0;
-    a_sum = 0;
-    b_sum = 0;
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
+                    
     #TODO: wrap this
     # Create a console logger for pretty formatting
     console = logging.getLogger("BCI_Overlay.py");
@@ -108,7 +99,15 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         max_indices = np.where(tile_probabilities[flash_bucket]==max_probability);
         
         # Grab one of the available max-probability tiles at random
-        max_choice = np.random.choice(max_indices[0]);
+        try:
+            max_choice = np.random.choice(max_indices[0]);
+        except Exception as e:
+            console.warning(tile_probabilities);
+            console.warning(flash_bucket);
+            console.warning(max_probability);
+            console.warning(max_indices);
+            raise e;
+
         
         # Init the flash group with this element and remove it from the flash bucket
         current_flash_group = np.array(flash_bucket[max_choice]);
@@ -416,6 +415,15 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             #TODO: consider adding this to pull_sample as a 100ms block instead
             time.sleep(0.1);    
         
+    #TODO: remove this    
+    # Track framerate/item performance
+    last_time = time.time();
+    n_frames = 0;
+    frame_time = 0;
+    a_sum = 0;
+    b_sum = 0;
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
     #########################
     #   Main Overlay Loop   #
     #########################
@@ -449,9 +457,12 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             
             # Check if input is a probability update
             if(processor_code == Processor_Code.PROBABILITY_UPDATE):
-            
+                        
                 # Update tile probabilities
-                tile_probabilities = processor_input;                                
+                tile_probabilities = processor_input[:N_TILES]; 
+                
+                # Reset the bucket        
+                flash_bucket = np.arange(N_TILES);
             
             # Check if processor_code is a tile classification
             elif(processor_code == Processor_Code.CLASSIFICATION):
@@ -546,6 +557,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Reset tile probabilities
                 tile_probabilities = np.ones((N_TILES,1))/N_TILES;
                 
+                # Reset the bucket        
+                flash_bucket = np.arange(N_TILES);
+            
                 # Flag to start a new classification
                 start_new_classification = True;
                 
@@ -743,10 +757,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         n_frames += 1;
         last_time = this_time;
         if(n_frames%20 == 0):
-            print(n_frames/frame_time);
-            print(a_sum/n_frames);
-            print(b_sum/n_frames);
-            print("~~~~~~~~~~~~~~~~");
+            console.info("fps: "+str(n_frames/frame_time));
+#            print(a_sum/n_frames);
+#            print(b_sum/n_frames);
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
     # End of Main overlay loop

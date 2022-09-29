@@ -38,11 +38,11 @@ def Start():
     # TODO: Shutdown_Controller() docstring
     def Shutdown_Controller():    
                     
+        console.critical("Shutting down BCI...");
+        
         ###################################
         #   Destroy the processor inlet   #
         ###################################
-        
-        console.critical("Shutting down BCI...");
         
         try:
             
@@ -66,6 +66,7 @@ def Start():
             console.warning("'processor_inlet' is not declared.");
             
         except Exception as e:
+
             raise e;
                   
         ##################################
@@ -155,9 +156,9 @@ def Start():
             
             raise e;
             
-        console.critical("BCI shutdown complete.");
         
         # End of Shutdown_Controller
+        console.critical("BCI shutdown complete.");
         pass;
         
     #TODO: Run() docstring
@@ -212,9 +213,9 @@ def Start():
         # Wait for the processor to broadcast its stream, then open an inlet to it
         inlet_stream = [];
         while(len(inlet_stream) < 1):
-            # Wait for 500ms, then try again (instead of blocking)
+            # Wait for 100ms, then try again (instead of blocking)
             # (this recycle between calls allows for interrupts)
-            inlet_stream = resolve_byprop("source_id", "P300_Processor", timeout = 0.5);
+            inlet_stream = resolve_byprop("source_id", "P300_Processor", timeout = 0.1);
             
         # If multiple outlets were found, shut down and raise error
         # (shutdown dependancies are not functioning or multiple processors are running)
@@ -316,6 +317,15 @@ def Start():
     
         # Main controller loop has exited, properly shutdown the BCI
         Shutdown_Controller();
+        
+    finally:
+               
+        import sys
+        sys.exit(0);
+
+    # End of Start()
+    pass;
+        
 
 #TODO: call this from a file that independently starts all 3 processes          
 Start();  

@@ -154,7 +154,6 @@ class FTDI_Handler:
         
         # Release the FTDI device's port
         self.device.close();
-        print("[FTDI_Handler.py]:","Released FTDI device.");
         
         # End of Release()
         pass;
