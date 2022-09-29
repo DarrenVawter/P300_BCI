@@ -224,7 +224,8 @@ def Start():
             elif(not waiting_for_consumer):
                 
                 # Init shutdown            
-                raise KeyboardInterrupt("Consumers disconnected");
+                console.warning("Processor disconnected unexpectedly.");
+                raise Exception("Consumer disconnected");
                             
             # Pull sample from the 8 EEG channels
             current_sample_EEG = np.array(sample.channels_data)*SCALE_FACTOR_EEG;
@@ -407,12 +408,12 @@ def Start():
         
     except KeyboardInterrupt:
         
+        console.warning("Keyboard interrupt detected");
         Shutdown_Cyton_Data_Packager();
     
     except Exception as e:
         
-        Shutdown_Cyton_Data_Packager();
-    
+        Shutdown_Cyton_Data_Packager();    
         raise e;
     
     else:

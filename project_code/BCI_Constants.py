@@ -20,11 +20,11 @@ GREEN = (0, 0, 255);
 #########################
 
 # Number of tiles flashed with each stimulus
-N_TILES_PER_FLASH = 10;
+N_TILES_PER_FLASH = 7;
 
 # Number of rows/cols to divide the overlay into
-N_TILE_ROWS = 10;
-N_TILE_COLUMNS = 10;
+N_TILE_ROWS = 7;
+N_TILE_COLUMNS = 7;
 
 # Total number of tiles on the overlay interface
 N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;

@@ -5,19 +5,7 @@
 @author: Darren Vawter
 """
 
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-#TODO: port MATLAB processor into Python
-
 # External Modules
-import gc;
 import time;
 import numpy as np;
 from scipy import signal as Signal;
@@ -150,11 +138,7 @@ def Start():
     #   Processor Entry point   #
     #############################
     def Run(processor_outlet, stimuli_inlet, EEG_inlet):
-                
-        
-        #TODO: move this and make it dynamic (re-calc on classification)
-        NON_TARGET_MULTIPLIER = 100/10 - 1;
-        
+           
         ###############################
         #   Define Helper Functions   #
         ###############################
@@ -239,7 +223,7 @@ def Start():
             # Check if the stream data is a program shutdown announcement
             elif(stimuli_code == Stimuli_Code.BCI_SHUTDOWN):
                 #TODO: generate a different kind of interrupt here
-                raise KeyboardInterrupt("BCI shutdown signal received.");
+                raise Exception("BCI shutdown signal received.");
                 
             # Check if the stream data is an interface shutdown announcement
             elif(stimuli_code == Stimuli_Code.INTERFACE_SHUTDOWN):
@@ -340,7 +324,7 @@ def Start():
         """
         def Handle_Incoming_EEG_Chunk(EEG_chunk):
             
-            nonlocal EEG_samples, EEG_sample_index, processor_running;#, live_EEG_index;
+            nonlocal EEG_samples, EEG_sample_index, processor_running, live_EEG_index, plot_time;
             
             # Filter the chunk
             EEG_chunk = Filter_Chunk(EEG_chunk);
@@ -351,20 +335,29 @@ def Start():
             #TODO: remove
             #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Live view
-            """
             if(live_EEG_index + chunk_size < N_LIVE_SAMPLES):
-                live_EEG[live_EEG_index:live_EEG_index+chunk_size] = EEG_chunk[:,3];
+                try:
+                    live_EEG[live_EEG_index:live_EEG_index+chunk_size,:] = EEG_chunk[:,:-1];
+                except Exception as e:
+                    console.warning(live_EEG_index);      
+                    console.warning(chunk_size);      
+                    console.warning(N_LIVE_SAMPLES);      
+                    console.warning(np.shape(live_EEG));                    
+                    raise e;
                 live_EEG_index = live_EEG_index+chunk_size;
             else:
-                live_EEG[live_EEG_index:] = EEG_chunk[:N_LIVE_SAMPLES-live_EEG_index,3];
-                live_EEG[:live_EEG_index+chunk_size-N_LIVE_SAMPLES] = EEG_chunk[N_LIVE_SAMPLES-live_EEG_index:,3];
-                live_EEG_index = live_EEG_index+chunk_size-N_LIVE_SAMPLES-1;
+                live_EEG[live_EEG_index:,:] = EEG_chunk[:N_LIVE_SAMPLES-live_EEG_index,:-1];
+                live_EEG[:live_EEG_index+chunk_size-N_LIVE_SAMPLES,:] = EEG_chunk[N_LIVE_SAMPLES-live_EEG_index:,:-1];
+                live_EEG_index = live_EEG_index+chunk_size-N_LIVE_SAMPLES;
                 
-            plt.ylim([np.min(live_EEG)-1,np.max(live_EEG)+1]);
-            plt.xlim([0,5]);
-            plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), live_EEG);
-            plt.show();
-            """
+            if(time.time()-plot_time >= 1):
+                for ch in range(8):
+                    plt.subplot(2,4,ch+1);
+                    plt.ylim([np.min(live_EEG[:,ch]),np.max(live_EEG[:,ch])]);
+                    plt.xlim([0,5]);
+                    plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), np.concatenate((live_EEG[live_EEG_index:,ch],live_EEG[:live_EEG_index,ch])));
+                plt.show();
+                plot_time = time.time();
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
             
             # Grab the indices of the first trial start, if any exist
@@ -614,7 +607,7 @@ def Start():
         #TODO: Calculate_Correlation_Coefficients() docstring
         def Calculate_Correlation_Coefficients(normalized_epoch):
             
-            nonlocal mwms_classifer;
+            nonlocal mwms_classifier;
             
             correlation_coefficients = np.zeros(CORRELATION_DEGREE);
             
@@ -622,6 +615,7 @@ def Start():
             
             classifier_width = SAMPLES_PER_EPOCH;
             
+            #TODO: the last degree doesn't need a "full" correlation, only the central coefficient
             for degree in range(CORRELATION_DEGREE):
                 
                 tier_data = np.zeros((classifier_width*2-1,N_EEG_CHANNELS));
@@ -630,7 +624,7 @@ def Start():
             
                 for channel in range(N_EEG_CHANNELS):
                     
-                    tier_data[:,channel] = np.correlate(mwms_classifer[degree,:classifier_width,channel],last_tier_data[:,channel],"full");
+                    tier_data[:,channel] = np.correlate(mwms_classifier[degree,:classifier_width,channel],last_tier_data[:,channel],"full");
                     
                     correlation_coefficient += tier_data[classifier_width,channel];
             
@@ -640,24 +634,39 @@ def Start():
                 classifier_width -= 1;
                 
                 last_tier_data = tier_data
-                last_tier_data[:classifier_width,:] = last_tier_data[:classifier_width,:] / np.sum(last_tier_data[:classifier_width,:],0);
+                last_tier_data[:classifier_width,:] = last_tier_data[:classifier_width,:]/np.linalg.norm(last_tier_data[:classifier_width,:],axis=0);
             
             return correlation_coefficients;
         
         #TODO: Calculate_Trial_Probability() docstring
         def Calculate_Trial_Probability(correlation_coefficients):         
     
-            # Generate an independent probability that this trial was a non-target trial
+        
+            #TODO: make a more permanent solution to this
+            flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 1)
+            n_per_flash = len(flashed);            
+            not_flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == -1);
+            n_not_used = len(not_flashed);
+            NON_TARGET_MULTIPLIER = (N_STREAM_ELEMENTS-1-n_not_used)/(n_per_flash)-1 #100/10 - 1;
+        
+            # Generate an independent probability (density) that this trial was a non-target trial
             trial_non_target_probability = non_target_mvn.pdf(correlation_coefficients);
             trial_non_target_probability *= NON_TARGET_MULTIPLIER;
-            
-            # Generate an independent probability that this trial was a target trial
+                        
+            # Generate an independent probability (density) that this trial was a target trial
             trial_target_probability = target_mvn.pdf(correlation_coefficients);
             
-            # Normalize the generated probabilities
+            # Normalize the generated probability densities
             p_space = trial_target_probability + trial_non_target_probability;
+            
             #trial_non_target_probability /= p_space; # = 1-target
             trial_target_probability /= p_space;
+            
+            console.info(str(correlation_coefficients)+"\n"+
+                         str(target_means)+"\n"+
+                         str(non_target_means)+"\n"+
+                         str(1-trial_target_probability)+"|"+str(trial_target_probability)+"\n"+
+                         str((stimuli_trial_data[EEG_epoch_index,40])));
             
             return trial_target_probability;
         
@@ -684,7 +693,10 @@ def Start():
             cell_probabilities[:] = cell_probabilities[:]/np.sum(cell_probabilities);
             
             # Weight previous probabilities
-            cell_probabilities[:] = old_probabilities[:] * 0.1 + cell_probabilities[:] * 0.9;
+            cell_probabilities[:] = old_probabilities[:] * 0.5 + cell_probabilities[:] * 0.5;
+
+            most_probable_cell = np.argmax(cell_probabilities);         
+            console.warning(str(most_probable_cell)+": "+str(np.amax(cell_probabilities))+"\n"+str(cell_probabilities));
             
             pass;
             
@@ -694,11 +706,11 @@ def Start():
             nonlocal waiting_start_new_classification;
             
             # Find what is currently the most probable cell
-            most_probable_cell = np.argmax(cell_probabilities);
+            most_probable_cell = np.argmax(cell_probabilities);         
             
             # Check if the most probable cell is above its threshold
             if(cell_probabilities[most_probable_cell] >= cell_thresholds[most_probable_cell]):
-                        
+                
                 # Flag that the processor is waiting for the BCI to start streaming current data
                 waiting_start_new_classification = True;
                 
@@ -707,6 +719,9 @@ def Start():
                 res = np.zeros(N_STREAM_ELEMENTS); # processor code = 0 --> classification
                 res[most_probable_cell] = 1;
                 processor_outlet.push_sample(res);
+                
+                raise KeyboardInterrupt("test");
+                
             
             # Else, a classification is not ready
             else:
@@ -719,7 +734,7 @@ def Start():
                 
                 
                 #TODO: remove once probabilities actually calculate
-                res [:-1] = 0.1*np.ones(N_STREAM_ELEMENTS-1);
+                res [:-1] = 0.1*np.zeros(N_STREAM_ELEMENTS-1);
                 
                 
                 processor_outlet.push_sample(res);
@@ -803,17 +818,18 @@ def Start():
         
         #TODO: remove this
         # Live view    
-        """
         live_EEG_index = 0;
         N_LIVE_SAMPLES = SAMPLING_FREQUENCY*5;
-        live_EEG = np.zeros(N_LIVE_SAMPLES);
+        live_EEG = np.zeros((N_LIVE_SAMPLES,N_EEG_CHANNELS));
         
         import matplotlib.pyplot as plt;    
-        plt.ylim([np.min(live_EEG)-1,np.max(live_EEG)+1]);
+        """
+        plt.ylim([np.min(live_EEG),np.max(live_EEG)]);
         plt.xlim([0,5]);
         plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), live_EEG);
         plt.show();
         """
+        plot_time = time.time();
         
         ####################################
         #   Initialize stimuli variables   #
@@ -836,7 +852,7 @@ def Start():
         #################################################
         mat_dict = LoadMAT("classifier_data.mat");
         
-        mwms_classifer = np.array(mat_dict['mwms_classifier']);
+        mwms_classifier = np.array(mat_dict['mwms_classifier']);
         non_target_means = np.reshape(np.array(mat_dict['non_target_means']),(CORRELATION_DEGREE));
         non_target_cov = np.array(mat_dict['non_target_cov']);
         target_means = np.reshape(np.array(mat_dict['target_means']),(CORRELATION_DEGREE));
@@ -897,6 +913,7 @@ def Start():
         start_signal = np.empty(N_STREAM_ELEMENTS);
         start_signal[-1] = Processor_Code.START;
         processor_outlet.push_sample(start_signal);
+        filter_start_time = time.time();
         
         ###########################
         #   Main Processor Loop   #
@@ -959,7 +976,7 @@ def Start():
                 if(not waiting_start_new_classification):
                     
                     # Normalize the epoch by channel
-                    normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.sum(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
+                    normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.linalg.norm(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
                     
                     # Calculate the correlation coefficients
                     correlation_coefficients = Calculate_Correlation_Coefficients(normalized_epoch); 
@@ -968,7 +985,8 @@ def Start():
                     trial_probability = Calculate_Trial_Probability(correlation_coefficients);
                     
                     # Update cell probabilities
-                    Update_Probabilities(trial_probability);
+                    if(time.time()-filter_start_time > 20):
+                        Update_Probabilities(trial_probability);
                     
                     #TODO: calculate the probability that the user was looking at the screen at all
                     

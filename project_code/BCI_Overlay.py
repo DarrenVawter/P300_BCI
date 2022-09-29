@@ -77,7 +77,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
         #TODO: dynamically handle if N_TILES is not a multiple of N_TILES_PER_FLASH
         
-        nonlocal flash_bucket, current_flash_group;
+        nonlocal flash_bucket, current_flash_group, exclude_bucket;
         
         # Check if the number of tiles available to flash is <= the tiles per flash
         if(len(flash_bucket) <= N_TILES_PER_FLASH):
@@ -87,6 +87,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             
             # Reset the bucket        
             flash_bucket = np.arange(N_TILES);
+            
+            # Remove the tiles to exclude
+            flash_bucket = np.delete(flash_bucket, exclude_bucket);
             
             # Exit the call early
             return;
@@ -367,6 +370,12 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     # Tiles that have not yet been flashed as part of the current set    
     flash_bucket = np.arange(N_TILES);
     
+    # Set of tiles that are not used within the grid
+    exclude_bucket = [];
+    
+    # Remove the exclude set from the flash bucket
+    flash_bucket = np.delete(flash_bucket, exclude_bucket);
+    
     # Randomized indices to reference the flash images
     flash_image_indices = np.arange(N_FLASH_IMAGES);
         
@@ -430,13 +439,6 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     console.debug("Start signal received from processor.");  
     overlay_running = True;
     while(overlay_running): 
-
-        #TODO: flesh out
-        # Check if the processor is still connected
-        if(not stimuli_outlet.have_consumers()):
-            Shutdown_Overlay();
-            #TODO: differentiate this interaction
-            return (Program_Interaction.EXIT,None);
         
         #############################
         #   Handle external input   #
@@ -468,7 +470,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             elif(processor_code == Processor_Code.CLASSIFICATION):
                                                 
                 # Find the id of the classified tile
-                classification_id = np.where(processor_input == 1)[0][0];
+                classification_id = np.where(processor_input[:-1] == 1)[0][0];
                                 
                 # Check if classified tile is an overlay control option
                 if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
@@ -535,7 +537,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 else:
 
                     # Update the magnification rect
-                    magnification_rect = Get_Tile_Rect(classification_id);
+                    magnification_rect = Get_Tile_Rect(int(classification_id));
                     
                     #TODO: find a way less ghetto solution than this
                     # Force-refresh the main screen by quickly alt-tabbing
@@ -546,7 +548,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     pyautogui.keyUp('alt');
                     
                     # Move the mouse to the center of the mirror to show where a click would be
-                    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH/2,OVERLAY_HEIGHT/2);
+                    #TODO: add this back in later
+                    #pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH/2,OVERLAY_HEIGHT/2);
                     
                 # Flag to start a new classification
                 start_new_classification = True;
@@ -566,6 +569,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Check if the processor is shutting down
             elif(processor_code == Processor_Code.PROCESSOR_SHUTDOWN):
            
+                console.warning("Received shutdown signal from processor.");
                 # Shutdown the overlay and flag the controller to close the BCI
                 Shutdown_Overlay();
                 #TODO: differentiate this interaction
@@ -595,6 +599,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
             # Set unused cells to -1
             stimuli_data[N_TILES:] = -1;
+            # Set excluded cells to -1
+            stimuli_data[exclude_bucket] = -1;
             # Set flashed cells to 1
             stimuli_data[current_flash_group] = 1;
             
@@ -746,6 +752,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         # Check to see if the program was closed through physical controls
         for event in pygame.event.get():
            if(event.type == pygame.QUIT):      
+               console.warning("User closed the application.");
                Shutdown_Overlay();
                #TODO: differentiate this interaction
                return (Program_Interaction.EXIT,None);
