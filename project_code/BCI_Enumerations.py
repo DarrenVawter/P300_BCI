@@ -95,13 +95,17 @@ class Processor_Code(IntEnum):
     PROBABILITY_UPDATE = 1;
     
     # Stream data is telling the interface to start training mode
-    START_TRAINING = -1;
+    START_OVERLAY_TRAINING = -1;
     # Stream data is telling the interface to start classification mode
-    START_CLASSIFICATION = -2;
+    START_OVERLAY_CLASSIFICATION = -2;
+    # Stream data is telling the interface to start training mode
+    START_KEYBOARD_TRAINING = -3;
+    # Stream data is telling the interface to start classification mode
+    START_KEYBOARD_CLASSIFICATION = -4;
     # Stream data is telling the interface to restart
-    RESTART = -3;
+    RESTART = -5;
     # Stream data is announcing that the processor is shutting down
-    PROCESSOR_SHUTDOWN = -4;
+    PROCESSOR_SHUTDOWN = -6;
 
 ######################################
 #   Enumerate stimuli stream codes   #
@@ -129,10 +133,10 @@ class Stimuli_Code(IntEnum):
     # Stream data is the start of a new classification and is a sync trial
     SYNC_START = 4;
 
-    # Stream data is requesting start from the processor
-    REQUEST_START = -1;
-    # Stream data is requesting a restart from the processor
-    REQUEST_RESTART = -2;
+    # Stream data is requesting overlay-start from the processor
+    REQUEST_OVERLAY_START = -1;
+    # Stream data is requesting overlay-start from the processor
+    REQUEST_KEYBOARD_START = -2;    
     # Stream data is announcing that the BCI is shutting down
     BCI_SHUTDOWN = -3;
     # Stream data is announcing that the interface is shutting down

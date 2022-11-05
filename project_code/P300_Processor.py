@@ -13,7 +13,8 @@ from scipy.stats import multivariate_normal as MVN;
 from math import ceil as ceil;
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
 import logging; # print pretty console logs
-
+import matplotlib.pyplot as plt;   
+        
 # Internal Modules
 from BCI_Enumerations import Stimuli_Code, Processor_Code, Processor_Mode;
 from BCI_Constants import N_STREAM_ELEMENTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS, N_TILES, N_TILES_PER_FLASH;
@@ -142,6 +143,144 @@ def Start():
         #   Define Helper Functions   #
         ###############################
         
+        # TODO: Start_Overlay() docstring
+        def Start_Overlay():
+            
+            nonlocal overlay_classifiers, overlay_target_means, overlay_target_cov, overlay_non_target_means, overlay_non_target_cov, overlay_non_target_mvn, overlay_target_mvn, processor_mode, target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
+            
+            # Check to see if pre-trained data is available to initialize a classifier
+            try:
+            
+                ###########################################
+                #   Load pre-trained overlay classifier   #
+                ###########################################
+                    
+                # Try to pull pre-trained overlay MWMS classifiers
+                # (correlation_degree x n_samples_per_epoch x n_channels)
+                overlay_classifiers = np.load("overlay_classifiers.npy");
+                
+                # If the pre-trained degree is less than the declared degree, treat these classifiers as insufficient
+                if(len(overlay_classifiers) < CORRELATION_DEGREE):
+                    raise FileNotFoundError();
+                # Else, trim off excess correlation degrees
+                else:
+                    overlay_classifiers = overlay_classifiers[:CORRELATION_DEGREE,:,:];
+                
+                # Load the pre-trained statistics for the overlay classifier
+                overlay_target_means = np.load("overlay_target_means.npy");
+                overlay_target_cov = np.load("overlay_target_cov.npy");
+                overlay_non_target_means = np.load("overlay_non_target_means.npy");
+                overlay_non_target_cov = np.load("overlay_non_target_cov.npy");
+    
+                # Define the overlay non target and target distributions
+                overlay_non_target_mvn = MVN(mean = overlay_non_target_means, cov = overlay_non_target_cov);
+                overlay_target_mvn = MVN(mean = overlay_target_means, cov = overlay_target_cov);
+            
+                # Set the processor mode
+                processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
+                
+                # Send the BCI a signal to start in classification mode
+                console.info("Sending start-overlay-classification signal to BCI.");
+                start_signal = np.empty(N_STREAM_ELEMENTS);
+                start_signal[-1] = Processor_Code.START_OVERLAY_CLASSIFICATION;
+                processor_outlet.push_sample(start_signal);
+                            
+            # Else, there is no training data available; training is needed
+            except FileNotFoundError:
+                
+                #####################################
+                #   Initialize training variables   #
+                #####################################
+                
+                # Initialize target training epoch array
+                target_epochs = np.empty((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                target_epochs_received = 0;
+                
+                # Initialize non-target training epoch array
+                non_target_epochs = np.empty((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                non_target_epochs_received = 0;
+            
+                # Set the processor mode
+                processor_mode = Processor_Mode.TRAINING_OVERLAY;
+                
+                # Send the BCI a signal to start in training mode
+                console.info("Sending start-overlay-training signal to BCI.");
+                start_signal = np.empty(N_STREAM_ELEMENTS);
+                start_signal[-1] = Processor_Code.START_OVERLAY_TRAINING;
+                processor_outlet.push_sample(start_signal);
+            
+            # End of Start_Overlay()
+            pass;
+            
+        # TODO: Start_Keyboard() docstring
+        def Start_Keyboard():
+            
+            nonlocal keyboard_classifiers, keyboard_target_means, keyboard_target_cov, keyboard_non_target_means, keyboard_non_target_cov, keyboard_non_target_mvn, keyboard_target_mvn, processor_mode,target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
+            
+            # Check to see if pre-trained data is available to initialize a classifier
+            try:
+            
+                ###########################################
+                #   Load pre-trained overlay classifier   #
+                ###########################################
+                    
+                # Try to pull pre-trained overlay MWMS classifiers
+                # (correlation_degree x n_samples_per_epoch x n_channels)
+                keyboard_classifiers = np.load("keyboard_classifiers.npy");
+                
+                # If the pre-trained degree is less than the declared degree, treat these classifiers as insufficient
+                if(len(keyboard_classifiers) < CORRELATION_DEGREE):
+                    raise FileNotFoundError();
+                # Else, trim off excess correlation degrees
+                else:
+                    keyboard_classifiers = keyboard_classifiers[:CORRELATION_DEGREE,:,:];
+                
+                # Load the pre-trained statistics for the overlay classifier
+                keyboard_target_means = np.load("keyboard_target_means.npy");
+                keyboard_target_cov = np.load("keyboard_target_cov.npy");
+                keyboard_non_target_means = np.load("keyboard_non_target_means.npy");
+                keyboard_non_target_cov = np.load("keyboard_non_target_cov.npy");
+    
+                # Define the overlay non target and target distributions
+                keyboard_non_target_mvn = MVN(mean = keyboard_non_target_means, cov = keyboard_non_target_cov);
+                keyboard_target_mvn = MVN(mean = keyboard_target_means, cov = keyboard_target_cov);
+            
+                # Set the processor mode
+                processor_mode = Processor_Mode.CLASSIFICATION_KEYBOARD;
+                
+                # Send the BCI a signal to start in classification mode
+                console.info("Sending start-keyboard-classification signal to BCI.");
+                start_signal = np.empty(N_STREAM_ELEMENTS);
+                start_signal[-1] = Processor_Code.START_KEYBOARD_CLASSIFICATION;
+                processor_outlet.push_sample(start_signal);
+                            
+            # Else, there is no training data available; training is needed
+            except FileNotFoundError:
+                
+                #####################################
+                #   Initialize training variables   #
+                #####################################
+                
+                # Initialize target training epoch array
+                target_epochs = np.empty((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                target_epochs_received = 0;
+                
+                # Initialize non-target training epoch array
+                non_target_epochs = np.empty((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                non_target_epochs_received = 0;
+            
+                # Set the processor mode
+                processor_mode = Processor_Mode.TRAINING_KEYBOARD;
+                
+                # Send the BCI a signal to start in training mode
+                console.info("Sending start-keyboard-training signal to BCI.");
+                start_signal = np.empty(N_STREAM_ELEMENTS);
+                start_signal[-1] = Processor_Code.START_KEYBOARD_TRAINING;
+                processor_outlet.push_sample(start_signal);
+            
+            # End of Start_Keyboard()
+            pass;
+        
         """
         
         Handle_Incoming_Stimulus()
@@ -221,17 +360,18 @@ def Start():
                 # Increment the count of trials received    
                 total_trials_received += 1;  
                 
-            # Check if the stream data is a start request
-            elif(stimuli_code == Stimuli_Code.REQUEST_START):
-                #TODO: this probably shouldn't happen --> decide what to do
+            # Check if the stream data is an overlay start request
+            elif(stimuli_code == Stimuli_Code.REQUEST_OVERLAY_START):
+
+                #TODO: handle interface switching                 
                 pass;
                 
-            # Check if the stream data is a restart request
-            elif(stimuli_code == Stimuli_Code.REQUEST_RESTART):
-                #TODO: decide what to do when the interface is requesting a restart
-                #(if this is even necessary)
+            # Check if the stream data is an overlay start request
+            elif(stimuli_code == Stimuli_Code.REQUEST_KEYBOARD_START):
+
+                #TODO: handle interface switching                 
                 pass;
-                
+                                
             # Check if the stream data is a program shutdown announcement
             elif(stimuli_code == Stimuli_Code.BCI_SHUTDOWN):
                 #TODO: generate a different kind of interrupt here
@@ -550,10 +690,8 @@ def Start():
             # End of Construct_Epoch()
             pass;
             
-        """
-        #TODO: docstring        
-        """
-        def Initialize_Classifier():
+        #TODO: Initialize_Overlay_Classifier() docstring
+        def Initialize_Overlay_Classifier():
             
             nonlocal overlay_classifiers, overlay_target_means, overlay_target_cov, overlay_target_mvn, overlay_non_target_means, overlay_non_target_cov, overlay_non_target_mvn;
             
@@ -667,17 +805,145 @@ def Start():
 
             # Save the pre-trained classifier
         
-            np.save("classifiers.npy", overlay_classifiers);
-            np.save("target_means.npy", overlay_target_means);
-            np.save("target_cov.npy", overlay_target_cov);
-            np.save("non_target_means.npy", overlay_non_target_means);
-            np.save("non_target_cov.npy", overlay_non_target_cov);
+            np.save("overlay_classifiers.npy", overlay_classifiers);
+            np.save("overlay_target_means.npy", overlay_target_means);
+            np.save("overlay_target_cov.npy", overlay_target_cov);
+            np.save("overlay_non_target_means.npy", overlay_non_target_means);
+            np.save("overlay_non_target_cov.npy", overlay_non_target_cov);
 
             # Generate normal distributions from the training statistics
             overlay_target_mvn = MVN(mean = overlay_target_means, cov = overlay_target_cov);
             overlay_non_target_mvn = MVN(mean = overlay_non_target_means, cov = overlay_non_target_cov);
        
-            # End of Initialize_Classifier()
+            # End of Initialize_Overlay_Classifier()
+            pass;
+            
+        #TODO: Initialize_Keyboard_Classifier() docstring
+        def Initialize_Keyboard_Classifier():
+            
+            nonlocal keyboard_classifiers, keyboard_target_means, keyboard_target_cov, keyboard_target_mvn, keyboard_non_target_means, keyboard_non_target_cov, keyboard_non_target_mvn;
+            
+            console.info("Initializing classifier...");
+                                 
+            # Declare classifiers
+            keyboard_classifiers = np.zeros((CORRELATION_DEGREE,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            
+            # Declare correlation coefficients
+            target_coefficients = np.empty((CORRELATION_DEGREE, N_TRAINING_TARGETS));
+            non_target_coefficients = np.empty((CORRELATION_DEGREE, N_TRAINING_NON_TARGETS));
+            
+            # 0th degree classifier is just the average target signal
+            keyboard_classifiers[0,:,:] = np.sum(target_epochs, axis=0) / len(target_epochs);
+    
+            # 0th degree correlation data is the uncorrelated data                    
+            target_data = target_epochs;
+            non_target_data = non_target_epochs;
+    
+            # Initialize a classifier for each degree of correlation
+            for order in range(CORRELATION_DEGREE):
+            
+                # Normalize the previous degree's correlation
+                keyboard_classifiers[order,:,:] /= np.linalg.norm(keyboard_classifiers[order,:,:], axis=0, ord=3);
+                
+                # Initialize output of this degree's correlation per sample
+                next_target_data = np.zeros((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                next_non_target_data = np.zeros((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            
+                # For each target trial
+                for target_index in range(N_TRAINING_TARGETS):
+                    
+                    # Normalize the trial
+                    target_data[target_index,:,:] /= np.linalg.norm(target_data[target_index,:,:], axis=0, ord=3);
+            
+                    # Initialize the correlation coefficient
+                    coefficient = 0;
+                    
+                    # For each eeg channel
+                    for channel in range(N_EEG_CHANNELS):
+                    
+                        # Increment the correlation coefficient by the result of the channel's correlation coefficient
+                        coefficient += np.correlate(keyboard_classifiers[order,:,channel],target_data[target_index,:,channel]);   
+                        
+                        # Calculate the cross correlation of the trial with the current degree of the classifier
+                        corr = np.correlate(keyboard_classifiers[order,:,channel],target_data[target_index,:,channel],"same");      
+                        
+                        # Store the cross correlation result for the next degree
+                        next_target_data[target_index,:,channel] = corr;            
+                        
+                        # Increment the next degree's classifier by the cross correlation result
+                        if(order+1<CORRELATION_DEGREE):
+                            keyboard_classifiers[order+1,:,channel] += corr;
+                    
+                    # Calculate the average per-channel correlation coefficient
+                    target_coefficients[order,target_index] = coefficient/N_EEG_CHANNELS;
+                    
+                # Calculate the average per-target correlation result for this degree
+                if(order+1<CORRELATION_DEGREE):
+                    keyboard_classifiers[order+1,:,:] /= N_TRAINING_TARGETS;                    
+                
+                # For each non-target trial
+                for non_target_index in range(N_TRAINING_NON_TARGETS):
+                    
+                    # Normalize the trial
+                    non_target_data[non_target_index,:,:] /= np.linalg.norm(non_target_data[non_target_index,:,:], axis=0, ord=3);
+                    
+                    # Initialize the correlation coefficient
+                    coefficient = 0;
+                    
+                    # For each eeg channel
+                    for channel in range(N_EEG_CHANNELS):
+                        
+                        # Increment the correlation coefficient by the result of the channel's correlation coefficient
+                        coefficient += np.correlate(keyboard_classifiers[order,:,channel],non_target_data[non_target_index,:,channel]);
+                    
+                        # Calculate the cross correlation of the trial with the current degree of the classifier
+                        corr = np.correlate(keyboard_classifiers[order,:,channel],non_target_data[non_target_index,:,channel],"same");   
+                    
+                        # Store the cross correlation result for the next degree
+                        next_non_target_data[non_target_index,:,channel] = corr;
+                            
+                    # Calculate the average per-channel correlation coefficient
+                    non_target_coefficients[order,non_target_index] = coefficient/N_EEG_CHANNELS;
+                    
+                # Plot a histogram for the non-target and target distributions
+                plt.subplot(2,2,order+1);
+                _, nt_bins, _ = plt.hist(non_target_coefficients[order,:], alpha=0.5);
+                _, t_bins, _ = plt.hist(target_coefficients[order,:], alpha=0.5);    
+                        
+                # Generate x axis
+                x = np.arange(np.min(non_target_coefficients[order,:]),np.max(target_coefficients[order,:]),0.01);
+                
+                # Plot a 1-d target pdf
+                target_mvn = MVN(mean = np.mean(target_coefficients[order,:]), cov = np.std(target_coefficients[order,:])**2);
+                plt.plot(x,target_mvn.pdf(x)*N_TRAINING_TARGETS*(t_bins[1]-t_bins[0]));  
+                   
+                # Plot a 1-d non-target pdf
+                non_target_mvn = MVN(mean = np.mean(non_target_coefficients[order,:]), cov = np.std(non_target_coefficients[order,:])**2);
+                plt.plot(x,non_target_mvn.pdf(x)*N_TRAINING_NON_TARGETS*(nt_bins[1]-nt_bins[0]));  
+                   
+                # Set the next degree's data as the output from this degree
+                target_data = next_target_data;
+                non_target_data = next_non_target_data;
+                
+            # Calculate the training statistics
+            keyboard_target_means = np.mean(target_coefficients, axis=1);
+            keyboard_target_cov = np.cov(target_coefficients);
+            keyboard_non_target_means = np.mean(non_target_coefficients, axis=1);
+            keyboard_non_target_cov = np.cov(non_target_coefficients);
+
+            # Save the pre-trained classifier
+        
+            np.save("keyboard_classifiers.npy", keyboard_classifiers);
+            np.save("keyboard_target_means.npy", keyboard_target_means);
+            np.save("keyboard_target_cov.npy", keyboard_target_cov);
+            np.save("keyboard_non_target_means.npy", keyboard_non_target_means);
+            np.save("keyboard_non_target_cov.npy", keyboard_non_target_cov);
+
+            # Generate normal distributions from the training statistics
+            keyboard_target_mvn = MVN(mean = keyboard_target_means, cov = keyboard_target_cov);
+            keyboard_non_target_mvn = MVN(mean = keyboard_non_target_means, cov = keyboard_non_target_cov);
+       
+            # End of Initialize_Keyboard_Classifier()
             pass;
     
         """
@@ -751,10 +1017,16 @@ def Start():
             
         #TODO: Calculate_Correlation_Coefficients() docstring
         def Calculate_Correlation_Coefficients(normalized_epoch):
-            
-            
+                        
             #TODO: comments
             
+            if(processor_mode == Processor_Mode.CLASSIFICATION_OVERLAY):
+                classifiers = overlay_classifiers;
+            elif(processor_mode == Processor_Mode.CLASSIFICATION_KEYBOARD):
+                classifiers = keyboard_classifiers;
+            else:
+                raise RuntimeError();
+                
             correlation_coefficients = np.zeros(CORRELATION_DEGREE);
             
             current_data = normalized_epoch;
@@ -766,9 +1038,9 @@ def Start():
                 
                 for channel in range(N_EEG_CHANNELS):
                     
-                    correlation_coefficients[order] += np.correlate(overlay_classifiers[order,:,channel],current_data[:,channel]);    
+                    correlation_coefficients[order] += np.correlate(classifiers[order,:,channel],current_data[:,channel]);    
                     
-                    next_data[:,channel] = np.correlate(overlay_classifiers[order,:,channel],current_data[:,channel], "same"); 
+                    next_data[:,channel] = np.correlate(classifiers[order,:,channel],current_data[:,channel], "same"); 
 
                 correlation_coefficients[order] /= 8;
                 
@@ -782,6 +1054,15 @@ def Start():
         #TODO: Calculate_Trial_Probability() docstring
         def Calculate_Trial_Probability(correlation_coefficients):         
             
+            if(processor_mode == Processor_Mode.CLASSIFICATION_OVERLAY):
+                target_mvn = overlay_target_mvn;
+                non_target_mvn = overlay_non_target_mvn;
+            elif(processor_mode == Processor_Mode.CLASSIFICATION_KEYBOARD):
+                target_mvn = keyboard_target_mvn;
+                non_target_mvn = keyboard_non_target_mvn;
+            else:
+                raise RuntimeError();
+                
             # Get the number per flash
             flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 1);
             n_per_flash = len(flashed);  
@@ -794,10 +1075,10 @@ def Start():
             n_used = n_per_flash + n_not_flashed;
             
             # Generate an independent probability (density) that this trial was a target trial
-            trial_target_probability = overlay_target_mvn.pdf(correlation_coefficients)*n_per_flash/n_used;
+            trial_target_probability = target_mvn.pdf(correlation_coefficients)*n_per_flash/n_used;
             
             # Generate an independent probability (density) that this trial was a non-target trial
-            trial_non_target_probability = overlay_non_target_mvn.pdf(correlation_coefficients)*n_not_flashed/n_used;
+            trial_non_target_probability = non_target_mvn.pdf(correlation_coefficients)*n_not_flashed/n_used;
                                               
             # Normalize the generated probability densities
             p_space = trial_target_probability + trial_non_target_probability;
@@ -875,12 +1156,13 @@ def Start():
                 
                 #TODO: remove once probabilities actually calculate
                 res [:-1] = 0.1*np.zeros(N_STREAM_ELEMENTS-1);
-                
-                
+                                
                 processor_outlet.push_sample(res);
                     
             # End of Broadcast_Classification_Status()
             pass;
+            
+            
             
         ##########################
         #   Initialize Filters   #
@@ -907,7 +1189,7 @@ def Start():
         ######################################
         
         #TODO: comment these        
-        N_TRAINING_TARGETS = 300;
+        N_TRAINING_TARGETS = 30;
         N_TRAINING_NON_TARGETS = ceil(N_TRAINING_TARGETS*((N_TILES/N_TILES_PER_FLASH)-1));
         CORRELATION_DEGREE = 4;        
         FILTER_SETTLING_TIME = 20;
@@ -941,6 +1223,30 @@ def Start():
         # Track whether the processor is waiting for the first trial of the new classification
         waiting_start_new_classification = False;
         
+        # Overlay trained parameters
+        overlay_classifiers = None;
+        overlay_target_means = None;
+        overlay_target_cov = None;
+        overlay_target_mvn = None;
+        overlay_non_target_means = None;
+        overlay_non_target_cov = None;
+        overlay_non_target_mvn = None;
+        
+        # Keyboard trained parameters
+        keyboard_classifiers = None;
+        keyboard_target_means = None;
+        keyboard_target_cov = None;
+        keyboard_target_mvn = None;
+        keyboard_non_target_means = None;
+        keyboard_non_target_cov = None;
+        keyboard_non_target_mvn = None;
+        
+        # New training data
+        target_epochs = None;
+        target_epochs_received = 0;
+        non_target_epochs = None;
+        non_target_epochs_received = 0;
+            
         ################################
         #   Initialize EEG variables   #
         ################################
@@ -970,7 +1276,6 @@ def Start():
         N_LIVE_SAMPLES = SAMPLING_FREQUENCY*5;
         live_EEG = np.zeros((N_LIVE_SAMPLES,N_EEG_CHANNELS));
         
-        import matplotlib.pyplot as plt;    
         """
         plt.ylim([np.min(live_EEG),np.max(live_EEG)]);
         plt.xlim([0,5]);
@@ -1017,7 +1322,7 @@ def Start():
             if(stimulus_input is not None):
                 
                 # Check if the received signal is the start request
-                if(stimulus_input[-1] == Stimuli_Code.REQUEST_START):
+                if(stimulus_input[-1] == Stimuli_Code.REQUEST_OVERLAY_START or stimulus_input[-1] == Stimuli_Code.REQUEST_KEYBOARD_START):
                     
                     # Exit the blocking loop
                     break;
@@ -1041,80 +1346,26 @@ def Start():
         # (this setup chunk will contain the FTDI turning on prior to the pins stabalizing --> we want to throw this out)
         EEG_inlet.pull_chunk(0.0);
 
-        # Check to see if pre-trained data is available to initialize a classifier
-        try:
-        
-            ###########################################
-            #   Load pre-trained overlay classifier   #
-            ###########################################
-        
-            overlay_classifiers = None;
-            overlay_target_means = None;
-            overlay_target_cov = None;
-            overlay_target_mvn = None;
-            overlay_non_target_means = None;
-            overlay_non_target_cov = None;
-            overlay_non_target_mvn = None;
-        
-            # Try to pull pre-trained overlay MWMS classifiers
-            # (correlation_degree x n_samples_per_epoch x n_channels)
-            overlay_classifiers = np.load("classifiers.npy");
+        # Check if the start request was for overlay mode
+        if(stimulus_input[-1] == Stimuli_Code.REQUEST_OVERLAY_START):
             
-            # If the pre-trained degree is less than the declared degree, treat these classifiers as insufficient
-            if(len(overlay_classifiers) < CORRELATION_DEGREE):
-                raise FileNotFoundError();
-            # Else, trim off excess correlation degrees
-            else:
-                overlay_classifiers = overlay_classifiers[:CORRELATION_DEGREE,:,:];
+            # Handle the overlay start
+            Start_Overlay();            
             
-            # Load the pre-trained statistics for the overlay classifier
-            overlay_target_means = np.load("target_means.npy");
-            overlay_target_cov = np.load("target_cov.npy");
-            overlay_non_target_means = np.load("non_target_means.npy");
-            overlay_non_target_cov = np.load("non_target_cov.npy");
-
-            # Define the overlay non target and target distributions
-            overlay_non_target_mvn = MVN(mean = overlay_non_target_means, cov = overlay_non_target_cov);
-            overlay_target_mvn = MVN(mean = overlay_target_means, cov = overlay_target_cov);
-        
-            # Set the processor mode
-            processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
+        # Else, check if the start request was for keyboard mode
+        elif(stimulus_input[-1] == Stimuli_Code.REQUEST_KEYBOARD_START):
             
-            # Send the BCI a signal to start in classification mode
-            console.info("Sending classification-start signal to BCI.");
-            start_signal = np.empty(N_STREAM_ELEMENTS);
-            start_signal[-1] = Processor_Code.START_CLASSIFICATION;
-            processor_outlet.push_sample(start_signal);
+            # Handle the keyboard start
+            Start_Keyboard();         
+          
+        # Else, unknown error
+        else:
             
-            # Start a timer to ensure the filter initializes before collecting data
-            filter_start_time = time.time();
+            raise RuntimeError();
             
-        # Else, there is no training data available; training is needed
-        except FileNotFoundError:
-            
-            #####################################
-            #   Initialize training variables   #
-            #####################################
-            
-            # Initialize target training epoch array
-            target_epochs = np.empty((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
-            target_epochs_received = 0;
-            
-            # Initialize non-target training epoch array
-            non_target_epochs = np.empty((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
-            non_target_epochs_received = 0;
-        
-            # Set the processor mode
-            processor_mode = Processor_Mode.TRAINING_OVERLAY;
-            
-            # Send the BCI a signal to start in training mode
-            console.info("Sending training-start signal to BCI.");
-            start_signal = np.empty(N_STREAM_ELEMENTS);
-            start_signal[-1] = Processor_Code.START_TRAINING;
-            processor_outlet.push_sample(start_signal);
-            
-            # Start a timer to ensure the filter initializes before collecting data
-            filter_start_time = time.time();
+        #TODO: initialize this in and pass this from BCI_Controller
+        # Start a timer to ensure the filter initializes before collecting data
+        filter_start_time = time.time();
                     
         ###########################
         #   Main Processor Loop   #
@@ -1206,25 +1457,45 @@ def Start():
                         # Check if the training limit has been reached
                         if(target_epochs_received==N_TRAINING_TARGETS and non_target_epochs_received==N_TRAINING_NON_TARGETS):
                             
-                            # Save training data (for testing purposes)
-                            np.save("targets.npy", target_epochs);
-                            np.save("non_targets.npy", non_target_epochs);
+                            if(processor_mode == Processor_Mode.TRAINING_OVERLAY):
+                                
+                                # Save overlay training data (for testing purposes)
+                                np.save("overlay_targets.npy", target_epochs);
+                                np.save("overlay_non_targets.npy", non_target_epochs);
+                                
+                                # Initialize classifier
+                                Initialize_Overlay_Classifier();  
+                                
+                                # Switch the processor to overlay classification mode
+                                processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
                             
-                            # Initialize classifier
-                            Initialize_Classifier();                            
+                                # Send the BCI a signal to start in overlay classification mode
+                                console.info("Sending start-overlay-classification signal to BCI.");
+                                start_signal = np.empty(N_STREAM_ELEMENTS);
+                                start_signal[-1] = Processor_Code.START_OVERLAY_CLASSIFICATION;
+                                processor_outlet.push_sample(start_signal);
                             
-                            # Switch the processor to overlay classification mode
-                            processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
+                            elif(processor_mode == Processor_Mode.TRAINING_KEYBOARD):
+                                
+                                # Save keyboard training data (for testing purposes)
+                                np.save("keyboard_targets.npy", target_epochs);
+                                np.save("keyboard_non_targets.npy", non_target_epochs);
+                                                
+                                # Initialize classifier
+                                Initialize_Keyboard_Classifier();   
                             
+                                # Switch the processor to overlay classification mode
+                                processor_mode = Processor_Mode.CLASSIFICATION_KEYBOARD;
+                            
+                                # Send the BCI a signal to start in overlay classification mode
+                                console.info("Sending start-keyboard-classification signal to BCI.");
+                                start_signal = np.empty(N_STREAM_ELEMENTS);
+                                start_signal[-1] = Processor_Code.START_KEYBOARD_CLASSIFICATION;
+                                processor_outlet.push_sample(start_signal);
+                                
                             # Flag that the processor is waiting for a new classification trial
                             waiting_start_new_classification = True;
-                            
-                            # Send the BCI a signal to start in classification mode
-                            console.info("Sending classification-start signal to BCI.");
-                            start_signal = np.empty(N_STREAM_ELEMENTS);
-                            start_signal[-1] = Processor_Code.START_CLASSIFICATION;
-                            processor_outlet.push_sample(start_signal);
-                            
+                                                        
                         elif(target_epochs_received%(N_TRAINING_TARGETS/20) == 0 ):
                             
                             console.debug(100*target_epochs_received/N_TRAINING_TARGETS);

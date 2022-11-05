@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-This module displays a screen overlay running a P300 speller to the user.
+This module displays a virtual keyboard running a P300 speller to the user.
 
 @author: Darren Vawter
 """
@@ -9,20 +9,20 @@ This module displays a screen overlay running a P300 speller to the user.
 import time;
 import numpy as np; # fast arrays&manipulation
 import pygame; # display to the screen and play sounds
-import d3dshot; # grab screen pixels
 import pyautogui; # virtualize keyboard & mouse control
 from math import floor, ceil;
+import random;
 import logging; # print pretty console logs
 
 # Internal Modules
 from BCI_Enumerations import Program_Interaction, PC_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
-from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
+from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, KEY_LOCATIONS, KEY_CHARACTERS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
-###########################################################
-#   Dislpay the screen overlay and run the P300 Speller   #
-###########################################################
-def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
+#############################################################
+#   Dislpay the virtual keyboard and run the P300 Speller   #
+#############################################################
+def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                     
     #TODO: wrap this
     # Create a console logger for pretty formatting
@@ -75,7 +75,10 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
         #TODO: dynamically handle if N_TILES is not a multiple of N_TILES_PER_FLASH
         
-        nonlocal flash_bucket, current_flash_group, exclude_bucket;
+        nonlocal flash_bucket, current_flash_group;
+        
+        for i in range(N_TILES_PER_FLASH):
+            current_flash_colors[i] = (random.randint(0,255),random.randint(0,255),random.randint(0,255));
         
         # Check if the number of tiles available to flash is <= the tiles per flash
         if(len(flash_bucket) <= N_TILES_PER_FLASH):
@@ -85,10 +88,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             
             # Reset the bucket        
             flash_bucket = np.arange(N_TILES);
-            
-            # Remove the tiles to exclude
-            flash_bucket = np.delete(flash_bucket, exclude_bucket);
-            
+                        
             # Exit the call early
             return;
             
@@ -133,123 +133,22 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
         # End of Choose_Flash_Tiles()
         pass;    
+               
+    #TODO: Handle_Key_Classification() docstring
+    def Handle_Key_Classification(classification_id):
         
-    """
-    
-    Get_Tile_Rect()
-    
-        This function returns the bounding rect of a tile given its id. The
-        bounding rect is defined as the portion of the screen being mirrored
-        through that rect on the overlay.
-    
-        arguments:
-            [tile_id]: int --> the id of the tile to return the rect of
-        returns:
-            [tile_rect]: [int, int, int, int] --> the left, top, right, & bottom of the tile's rect
-        exceptions:
-            [TypeError]: if tile_id is not an int
-            [ValueError]: if tile_id is not within the range [0, N_TILES) or if the tile_id is not from a magnification tile
-            
-    
-        --> Convert overlay tile dimensions to screen dimensions
-        
-        --> Calc the tile's column  
-                
-        --> Calculate tile's left relative to the screen by multiplying the column by the tile-to-screen conversion factor
-        
-        --> Calculate the tile's right by adding one tile-to-screen conversion factor to the left
-        
-        --> Calculate tile's top relative to the screen by multiplying the column by the tile-to-screen conversion factor
-        
-        --> Calculate the tile's bottom by adding one tile-to-screen conversion factor to the top
-        
-        --> Return the rect
-            
-    """
-    def Get_Tile_Rect(tile_id):
-        
-        # Validate tile_id type
-        if(type(tile_id) != int):
-            raise TypeError("[tile_id] must be an integer.");
-            
-        # Validate tile_id value
-        if(tile_id<0 or tile_id>=N_TILES):
-            raise ValueError("[tile_id] must be in the range [0, N_TILES).")  
-            
-        # Calc the tile's column  
-        col = tile_id % N_TILE_COLUMNS;
-        
-        # Calc the tile's row
-        row = floor(tile_id / N_TILE_COLUMNS);
-            
-        # Verify that the tile id represents a magnification tile
-        if(col == N_TILE_COLUMNS-1 or row == N_TILE_ROWS-1):
-            raise ValueError("[tile_id] must be the id of a magnification tile.")
-        
-        # Convert overlay tile dimensions to screen dimensions
-        tile_screen_width_conversion = (magnification_rect[2]-magnification_rect[0])/(N_TILE_COLUMNS-1);
-        tile_screen_height_conversion = (magnification_rect[3]-magnification_rect[1])/(N_TILE_ROWS-1);
-        
-        # Calculate tile's left/right relative to the screen using the overlay's magnification rect
-        left = floor(magnification_rect[0] + col * tile_screen_width_conversion);
-        right = ceil(left + tile_screen_width_conversion);
-        
-        # Calculate tile's top/bottom relative to the screen using the overlay's magnification rect
-        top = floor(magnification_rect[1] + row * tile_screen_height_conversion);
-        bottom = ceil(top + tile_screen_height_conversion);
-                    
-        # Return the rect
-        return [left, top, right, bottom];
-        
-        # End of Get_Tile_Rect()
-        pass;
-       
-    """
-    
-    Handle_Click()
-    
-        This function handles a BCI-triggered mouse click.
-        
-        arguments:
-            [click_type]: string --> The type of mouse click. (left/right/double)
-        returns:
-            [none]
-        exceptions:
-            [TypeError]: if click_type is not a string
-            [ValueError]: if click_type is not "left", "right", or "double"
-            
-    """
-    def Handle_Click(click_type):
-        
-        nonlocal magnification_rect;
-        
-        # Validate click_type type
-        if(type(click_type) != str):
-            raise TypeError("[click_type] must be a string.");
-                    
-        # Validate click_type value
-        if(not(click_type=="left" or click_type=="right" or click_type=="double")):
-            raise ValueError("[click_type] must be 'left', 'right', or 'double'.");  
-            
-        # Calculate the mouse coordinates
-        mouse_x = round((magnification_rect[0]+magnification_rect[2])/2);
-        mouse_y = round((magnification_rect[1]+magnification_rect[3])/2);
-
-        # Click the appropriate location
-        if(click_type=="double"):
-            pyautogui.doubleClick(x=mouse_x, y=mouse_y);
+        # Check if classified key is a normal char
+        if(classification_id < 36):
+            pyautogui.press(KEY_CHARACTERS[classification_id]);
         else:
-            pyautogui.click(x=mouse_x, y=mouse_y, button=click_type);
-            
-        # Return the mouse to the center of the overlay
-        pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
+            #TODO: handle others
+            pass;
         
-        # Reset the magnification rect to the full screen
-        magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];
-
-        # End of Handle_Click()
-        pass; 
-       
+        # End of Handle_Key_Classification()
+        pass;
+    
+    #TODO: change this to shutdown overlay
+        
     """
     
     Shutdown_Overlay()
@@ -270,7 +169,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     """
     def Shutdown_Overlay():
 
-        nonlocal screen_grabber, overlay_running;
+        nonlocal overlay_running;
 
         console.debug("Shutting down interface...");
         
@@ -282,7 +181,6 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
 
         #TODO: error catch more finely
         #TODO: maaayyybbbbeeee consider logging these
-        del screen_grabber;
         overlay_running = False;        
         
         console.debug("Interface shutdown complete.");
@@ -294,70 +192,47 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     #   Functional entry point   #
     ##############################
     
-    ################################
-    #   Define overlay constants   #
-    ################################            
+    #################################
+    #   Define keyboard constants   #
+    #################################            
         
     # Number of flash images to pull from
     N_FLASH_IMAGES = 10;
     
     # Time, in seconds, per training target
     TARGET_TIME = 12;
-    
-    # Calculate the dimensions of the overlay portion of the screen
-    OVERLAY_WIDTH = round(SCREEN_WIDTH*(1-1/N_TILE_COLUMNS));
-    OVERLAY_HEIGHT = round(SCREEN_HEIGHT*(1-1/N_TILE_ROWS));
-            
-    # Calculate the dimensions of the BCI interaction option bars
-    INTERACTIONS_WIDTH = SCREEN_WIDTH-OVERLAY_WIDTH;
-    INTERACTIONS_HEIGHT = SCREEN_HEIGHT-OVERLAY_HEIGHT;
-        
+                        
     # Tile dimensions are identical to the dimensions of the interaction bars
-    TILE_WIDTH = INTERACTIONS_WIDTH;
-    TILE_HEIGHT = INTERACTIONS_HEIGHT;
+    TILE_WIDTH = 100;
+    TILE_HEIGHT = TILE_WIDTH;
     
-    # Number of tiles in the overlay interface
-    N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
+    # Number of tiles in the keyboard interface
+    N_TILES = 37;
             
     # Load and scale flash images
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
     for i in range(N_FLASH_IMAGES):
         FLASH_IMAGES[i] = pygame.image.load('league_icons/'+str(i)+'.jpg')
-        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH*3/4, TILE_HEIGHT*3/4));
+        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH, TILE_HEIGHT));
         
-    # Load and scale interaction icons
-    BCI_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
-    BCI_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75, 0.75, 0.75, 0.5, 0.5, 1, 0.7]);
-    BCI_ICON_WIDTH = np.multiply(BCI_ICON_HEIGHT,[0.72, 0.72, 0.72, 0.85, 0.85, 1, 2]);
-    for i in range(N_BCI_CONTROLS):
-        BCI_INTERACTION_ICONS[i] = pygame.image.load('BCI_interaction_icons/'+str(i)+'.png')
-        BCI_INTERACTION_ICONS[i] = pygame.transform.scale(BCI_INTERACTION_ICONS[i], (BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]));
-        
-    # Load and scale interaction icons
-    OVERLAY_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
-    OVERLAY_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75]);
-    OVERLAY_ICON_WIDTH = np.multiply(OVERLAY_ICON_HEIGHT,[1]);
-    for i in range(N_OVERLAY_CONTROLS):
-        OVERLAY_INTERACTION_ICONS[i] = pygame.image.load('overlay_interaction_icons/'+str(i)+'.png')
-        OVERLAY_INTERACTION_ICONS[i] = pygame.transform.scale(OVERLAY_INTERACTION_ICONS[i], (OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]));
-        
-    ##################################
-    #   Initialize overlay objects   #
-    ##################################
-    
-    # Initialize screen grabber object
-    screen_grabber = d3dshot.create(capture_output="numpy", frame_buffer_size=1);    
-    screen_grabber.display = screen_grabber.displays[0];
-        
-    # Move the mouse to the center of the mirror to show where a click would be
-    pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH//2,OVERLAY_HEIGHT/2);
+    ###################################
+    #   Initialize keyboard objects   #
+    ###################################
     
     # Initialize game clock to cap fps
     clock = pygame.time.Clock();
     
-    ####################################
-    #   Initialize overlay variables   #
-    ####################################
+    # Initialize key font objects    
+    font = pygame.font.SysFont('Calibri', 90, True, False)
+    KEY_FONTS = [None] * len(KEY_CHARACTERS);
+    KEY_SIZES = [None] * len(KEY_CHARACTERS);
+    for key_index in range(len(KEY_CHARACTERS)): 
+        KEY_FONTS[key_index] = font.render(KEY_CHARACTERS[key_index], True, WHITE);
+        KEY_SIZES[key_index] = font.size(KEY_CHARACTERS[key_index]);
+    
+    #####################################
+    #   Initialize keyboard variables   #
+    #####################################
     
     # Initialize flash timer to track how long a group has been flashed for
     flash_timer = 0;
@@ -367,6 +242,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     # Tiles that are currently being flashed
     current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
+    current_flash_colors = np.zeros((N_TILES_PER_FLASH,3));
     
     #TODO: change dynamically with a timer
     
@@ -375,13 +251,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Initialize training target key ID
     target_tile = np.random.choice(flash_bucket);  
-    
-    # Set of tiles that are not used within the grid
-    exclude_bucket = [];
-    
-    # Remove the exclude set from the flash bucket
-    flash_bucket = np.delete(flash_bucket, exclude_bucket);
-    
+        
     # Randomized indices to reference the flash images
     flash_image_indices = np.arange(N_FLASH_IMAGES);
         
@@ -394,7 +264,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Define start request signal to send until processor acknowledges receipt by signaling back to start
     start_request = np.empty(N_STREAM_ELEMENTS).astype(int);
-    start_request[-1] = Stimuli_Code.REQUEST_START;
+    start_request[-1] = Stimuli_Code.REQUEST_KEYBOARD_START;
     
     # Initialize the mode to classification mode
     training_mode = False;
@@ -413,11 +283,11 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         if(processor_input is not None):
 
             # Verify that the input is a start signal
-            if(processor_input[-1] == Processor_Code.START_TRAINING):
+            if(processor_input[-1] == Processor_Code.START_KEYBOARD_TRAINING):
                             
-                console.debug("Starting overlay in training mode.");
+                console.warning("Starting keyboard interface in training mode.");
                 
-                # Start the overlay in training mode
+                # Start the keyboard in training mode
                 training_mode = True;
                 # Initialize the target timer to track how long the current target has been selected
                 target_timer = 0;
@@ -425,9 +295,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Exit blocking loop
                 break;
                 
-            elif(processor_input[-1] == Processor_Code.START_CLASSIFICATION):
+            elif(processor_input[-1] == Processor_Code.START_KEYBOARD_CLASSIFICATION):
                                 
-                console.debug("Starting overlay in classification mode.");
+                console.debug("Starting keyboard interface in classification mode.");
                 
                 # Set flag to show that next trial is the start of a new classification
                 start_new_classification = False;
@@ -445,7 +315,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 
                 #TODO: implement raising/handling an error since we should only expect a start signal here
                 #TODO: ^----? maybe ?
-                console.warning("Received processor code",Processor_Code(processor_input[-1]),"when start code was expected.");
+                console.debug("Received processor code",Processor_Code(processor_input[-1]),"when start code was expected.");
             
         # Else, attempt to again alert the processor that the BCI is ready & waiting
         else:
@@ -491,12 +361,12 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             processor_code = Processor_Code(processor_input[-1]);
             
             # Check if input is end of training
-            if(processor_code == Processor_Code.START_OVERLAY_CLASSIFICATION):
+            if(processor_code == Processor_Code.START_KEYBOARD_CLASSIFICATION):
 
                 # Check if currently in training mode
                 if(training_mode):
                     
-                    console.warning("Switching overlay to classification mode.");
+                    console.warning("Switching to keyboard classification mode.");
                 
                     # Reset tile probabilities
                     tile_probabilities = np.ones((N_TILES,1))/N_TILES;
@@ -530,86 +400,10 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Find the id of the classified tile
                 classification_id = np.where(processor_input[:-1] == 1)[0][0];
                 console.info(classification_id);
+                    
+                # Handle key classification
+                Handle_Key_Classification(classification_id);
                 
-                # Check if classified tile is an overlay control option
-                if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
-                
-                    # Convert control to overlay interaction
-                    program_interaction = Program_Interaction(classification_id%N_TILE_COLUMNS+10);
-                    
-                    # Check if the user zoomed out
-                    if(program_interaction == Program_Interaction.REVERT_MAGNIFICATION):
-                                            
-                        # Revert magnification to full screen
-                        #TODO: store the last zoom level and revert to that instead    
-                        magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];                       
-                        
-                # Check if classified tile is a BCI control option
-                elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
-
-                    # Convert control to BCI interaction
-                    PC_interaction = PC_Interaction(floor(classification_id/N_TILE_COLUMNS));
-                    
-                    # Check if the user left clicked
-                    if(PC_interaction == PC_Interaction.CLICK):
-                        
-                        # Handle the left click
-                        Handle_Click("left");
-                                                
-                    # Check if the user double clicked
-                    elif(PC_interaction == PC_Interaction.DOUBLE_CLICK):  
-                        
-                        # Handle the double click
-                        Handle_Click("double");
-                        
-                    # Check if the user right clicked
-                    elif(PC_interaction == PC_Interaction.RIGHT_CLICK):    
-                        
-                        # Handle the right click
-                        Handle_Click("right");  
-                        
-                    # Check if the user pressed page up
-                    elif(PC_interaction == PC_Interaction.PAGE_UP):  
-                        
-                        # Press the page up key
-                        pyautogui.press("pageup");  
-                        
-                    # Check if the user pressed page down
-                    elif(PC_interaction == PC_Interaction.PAGE_DOWN): 
-                        
-                        # Press the page down key
-                        pyautogui.press("pagedown");  
-                        
-                    # Check if the user tabbed
-                    elif(PC_interaction == PC_Interaction.TAB):  
-                        
-                        # Press the tab key
-                        pyautogui.press("tab");  
-                        
-                    # Check if the user pressed enter
-                    elif(PC_interaction == PC_Interaction.ENTER):   
-                        
-                        # Press the enter key 
-                        pyautogui.press("enter");                                     
-                    
-                # Else, classified tile is a magnification tile
-                else:
-
-                    # Update the magnification rect
-                    magnification_rect = Get_Tile_Rect(int(classification_id));
-                    
-                    #TODO: find a way less ghetto solution than this
-                    # Force-refresh the main screen by quickly alt-tabbing
-                    pyautogui.keyDown('alt');
-                    pyautogui.keyDown('tab');
-                    pyautogui.press('esc');
-                    pyautogui.keyUp('tab');
-                    pyautogui.keyUp('alt');
-                    
-                    # Move the mouse to the center of the mirror to show where a click would be
-                    #TODO: add this back in later
-                    #pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH/2,OVERLAY_HEIGHT/2);
-                    
                 # Flag to start a new classification
                 start_new_classification = True;
                 
@@ -659,21 +453,31 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     # 1  --> cell was flashed, cell is not the target of the trial
                     # 2  --> cell was not flashed, cell is the target of the trial
                     # 3  --> cell was flashed, cell is the target of the trial  
+                    
                 # Initialize output array to all zeros
                 stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
+                
                 # Set unused cells to -1
                 stimuli_data[N_TILES:] = -1;
-                # Set excluded cells to -1
-                stimuli_data[exclude_bucket] = -1;
+                
                 # Set flashed cells to 1
                 stimuli_data[current_flash_group] = 1;
+                
                 # Check if the target key was flashed
                 if(target_tile in current_flash_group):
+                    
+                    # Set the target key to 3
                     stimuli_data[target_tile] = 3;
+                    
                     # Send the UM232R a sync pulse
                     UM232R.Send_Sync();
+                    
+                # Else, the target key was not flashed
                 else:
+                    
+                    # Set the target key to 2
                     stimuli_data[target_tile] = 2;   
+                    
                     # Send the UM232R a sync pulse
                     UM232R.Send_Non_Sync();                 
             
@@ -687,12 +491,13 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     # -1 --> unused cell
                     # 0 --> used cell, not flashed this trial
                     # 1 --> used cell, flashed this trial
+                    
                 # Initialize output array to all zeros
                 stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
+                
                 # Set unused cells to -1
                 stimuli_data[N_TILES:] = -1;
-                # Set excluded cells to -1
-                stimuli_data[exclude_bucket] = -1;
+                
                 # Set flashed cells to 1
                 stimuli_data[current_flash_group] = 1;
             
@@ -762,51 +567,26 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
         # Overwrite previous background with all black for the new frame
         canvas.fill(BLACK);
-        
-        ################################
-        #   Render the screen mirror   #
-        ################################
-        
-        # Grab desired monitor area as np array
-        screen_capture = np.transpose(screen_grabber.screenshot(region=magnification_rect),(1,0,2));
-
-        # Convert np array to pygame surface
-        screen_capture = pygame.surfarray.make_surface(screen_capture);
-        
-        # Scale the mirror surface to fit the overlay region
-        screen_capture = pygame.transform.scale(screen_capture, (OVERLAY_WIDTH, OVERLAY_HEIGHT));
-        
-        # Render the mirror surface to the canvas
-        canvas.blit(screen_capture, (0,0));
-        
-        ###############################
-        #   Render the BCI controls   #
-        ###############################
-        
-        # Iterate over the BCI control options
-        for i in range(N_BCI_CONTROLS):
-
-            #TODO: remove this when the icon for double click is fixed
-            if(i==1):
-                canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH-BCI_ICON_WIDTH[i]), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
-                canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
-                continue;                
                 
-            # Renderthe appropriate BCI control icon
-            canvas.blit(BCI_INTERACTION_ICONS[i],[round((N_TILE_COLUMNS-0.5)*TILE_WIDTH-BCI_ICON_WIDTH[i]/2), round((i+0.5)*TILE_HEIGHT-BCI_ICON_HEIGHT[i]/2), BCI_ICON_WIDTH[i], BCI_ICON_HEIGHT[i]]);
+        ################################
+        #   Render the keyboard keys   #
+        ################################
         
-        ###################################
-        #   Render the overlay controls   #
-        ###################################
-                
-        # Iterate over the BCI control options
-        for i in range(N_OVERLAY_CONTROLS):
-
-            # Renderthe appropriate BCI control icon
-            canvas.blit(OVERLAY_INTERACTION_ICONS[i],[round((i+0.5)*TILE_WIDTH-OVERLAY_ICON_WIDTH[i]/2), round((N_TILE_ROWS-0.5)*TILE_HEIGHT-OVERLAY_ICON_HEIGHT[i]/2), OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]]);       
+        # For each key
+        for key_index in range(len(KEY_CHARACTERS)):
+            
+            # Draw gray background
+            pygame.draw.rect(canvas, GRAY, [KEY_LOCATIONS[key_index, 0], KEY_LOCATIONS[key_index, 1], TILE_WIDTH, TILE_HEIGHT]);
+        
+            # Draw key character
+            canvas.blit(KEY_FONTS[key_index], [KEY_LOCATIONS[key_index, 0] + TILE_WIDTH/2 - KEY_SIZES[key_index][0]/2, KEY_LOCATIONS[key_index, 1] + TILE_HEIGHT/2 - KEY_SIZES[key_index][1]/2+5]);
+        
+            # Draw white border
+            pygame.draw.rect(canvas, WHITE, [KEY_LOCATIONS[key_index, 0], KEY_LOCATIONS[key_index, 1], TILE_WIDTH, TILE_HEIGHT], 3)
+            
         
         # Check the target timer
-        
+                
         if(time.time()-target_timer < TARGET_TIME):
         
             #################################
@@ -814,16 +594,13 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             #################################
                         
             if(target_tile >= 0):
-                
-                # Get the tile's row
-                row = floor(target_tile / N_TILE_COLUMNS);
-                
-                # Get the tile's column
-                col = target_tile % N_TILE_COLUMNS;
-                
-                # Render the flash images border
-                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
-                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                              
+                # Draw target-key character
+                target_font = font.render(KEY_CHARACTERS[target_tile], True, WHITE);
+                target_w, _ = font.size(KEY_CHARACTERS[target_tile]);
+                canvas.blit(target_font, [960-target_w/2,10]);
+          
+                #TODO: render "CALIBRATION MODE" at the top
                 
             # Else, continually reset the target timer 
             else:
@@ -834,29 +611,17 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             ######################################################
             
             # Iterate over the tiles in the flash group
-            for i in range(N_TILES_PER_FLASH):
+            for i in range(len(current_flash_group)):
                 
-                # Get the tile's row
-                row = floor(current_flash_group[i] / N_TILE_COLUMNS);
-                
-                # Get the tile's column
-                col = current_flash_group[i] % N_TILE_COLUMNS;
-                
-                # Render the flash images border
-                pygame.draw.rect(canvas, WHITE, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
-                
+                # Draw random color border
+                pygame.draw.rect(canvas, current_flash_colors[i], [KEY_LOCATIONS[current_flash_group[i], 0]-16/2, KEY_LOCATIONS[current_flash_group[i], 1]-16/2, TILE_WIDTH+16, TILE_HEIGHT+16])
+                    
                 # Render the corresponding flash image
-                canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH+TILE_WIDTH/8, row*TILE_HEIGHT+TILE_HEIGHT/8, TILE_WIDTH*3/4, TILE_HEIGHT*3/4]);      
-        
+                canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[KEY_LOCATIONS[current_flash_group[i], 0], KEY_LOCATIONS[current_flash_group[i], 1], TILE_WIDTH, TILE_HEIGHT]);
+                        
             ###################################
             #   Finalize and draw the frame   #
             ###################################
-            
-            # Render tile boundaries
-            for i in range(N_TILE_COLUMNS):
-                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
-            for i in range(N_TILE_ROWS):
-                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
             
             # Cap fps
             clock.tick(FRAMERATE_CAP);
@@ -875,29 +640,16 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             flash_bucket = np.arange(N_TILES);
             
             # Initialize training target key ID
-            target_tile = np.random.choice(flash_bucket);  
-            
-            if(target_tile >= 0):
-                
-                # Get the tile's row
-                row = floor(target_tile / N_TILE_COLUMNS);
-                
-                # Get the tile's column
-                col = target_tile % N_TILE_COLUMNS;
-                
-                # Render the flash images border
-                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
-                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
-                
+            target_tile = np.random.choice(flash_bucket); 
+                             
+            # Draw target-key character
+            target_font = font.render(KEY_CHARACTERS[target_tile], True, WHITE);
+            target_w, _ = font.size(KEY_CHARACTERS[target_tile]);
+            canvas.blit(target_font, [960-target_w/2,10]);
+                            
             ###################################
             #   Finalize and draw the frame   #
             ###################################
-            
-            # Render tile boundaries
-            for i in range(N_TILE_COLUMNS):
-                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
-            for i in range(N_TILE_ROWS):
-                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
             
             # Cap fps
             clock.tick(FRAMERATE_CAP);
@@ -905,8 +657,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Display the buffered frame to the screen
             pygame.display.flip();
             
-            # Pause for 0.5 seconds
-            time.sleep(0.5);
+            # Pause for 1 second
+            time.sleep(1);
             
             # Reset the target timer
             target_timer = time.time();

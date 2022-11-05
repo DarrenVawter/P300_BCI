@@ -171,7 +171,8 @@ def Start():
         #######################################
         
         # Initialize the current BCI mode to the default overlay
-        current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
+        #current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
+        current_BCI_mode = BCI_Mode.KEYBOARD_INTERFACE;
         
         # Initialize the overlay rect
         magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];
@@ -249,7 +250,7 @@ def Start():
             elif(current_BCI_mode == BCI_Mode.KEYBOARD_INTERFACE):   
                 
                 # Launch the BCI keyboard
-                (program_interaction, data) = BCI_Keyboard.Run(UM232R, stimuli_outlet, processor_inlet);    
+                (program_interaction, data) = BCI_Keyboard.Run(UM232R, canvas, stimuli_outlet, processor_inlet);    
             
             ####################################
             #   Handle program interactions    #

@@ -5,6 +5,8 @@ This module is a header for the program's constant vars.
 @author: Darren Vawter
 """
 
+import numpy as np;
+
 ##############
 #   Colors   #
 ##############
@@ -42,6 +44,39 @@ N_KEYS = 45;
 
 # Number of keys flashed with each stimulus
 N_KEYS_PER_FLASH = 7;
+
+# Define the keyboard layout
+KEY_LOCATIONS = np.zeros((N_KEYS,2));
+KEY_CHARACTERS = "1234567890QWERTYUIOPASDFGHJKLZXCVBNM_";
+key_offset = 170;
+
+# Row 0 --> ['1','2','3','4','5','6','7','8','9','0']
+row_x_offset = 100;
+row_y = 390;
+for i in range(10):
+    KEY_LOCATIONS[i,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i,1] = row_y;
+    
+# Row 1
+row_x_offset = 100;
+row_y = 560;
+for i in range(10):
+    KEY_LOCATIONS[i+10,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+10,1] = row_y;
+    
+# Row 2
+row_x_offset = 145;
+row_y = 730;
+for i in range(10):
+    KEY_LOCATIONS[i+20,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+20,1] = row_y;
+    
+# Row 3
+row_x_offset = 220;
+row_y = 910;
+for i in range(10):
+    KEY_LOCATIONS[i+29,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+29,1] = row_y;
 
 ###################################
 #   BCI-wide physical constants   #
