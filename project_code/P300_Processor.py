@@ -9,15 +9,14 @@
 import time;
 import numpy as np;
 from scipy import signal as Signal;
-from scipy.io import loadmat as LoadMAT;
 from scipy.stats import multivariate_normal as MVN;
-from math import ceil;
+from math import ceil as ceil;
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop; # communicating with BCI and Cyton
 import logging; # print pretty console logs
 
 # Internal Modules
-from BCI_Enumerations import Stimuli_Code, Processor_Code;
-from BCI_Constants import N_STREAM_ELEMENTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS;
+from BCI_Enumerations import Stimuli_Code, Processor_Code, Processor_Mode;
+from BCI_Constants import N_STREAM_ELEMENTS, DEFAULT_THRESHOLD, SAMPLING_FREQUENCY, FLASH_FREQUENCY, N_EEG_CHANNELS, N_TILES, N_TILES_PER_FLASH;
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
 
 def Start():
@@ -206,16 +205,29 @@ def Start():
                 
             # Check if the stream data is training data
             elif(stimuli_code == Stimuli_Code.TRAINING):
-                #TODO: this
-                pass;
+                
+                # Append the stimulus input to the stimulus data
+                stimuli_trial_data[stimuli_trial_index,:] = stimulus_input[:];
+                
+                # Increment the next stimulus index
+                stimuli_trial_index += 1;        
+                
+                # Check if the stimulus index needs to roll over
+                if(stimuli_trial_index >= STIMULI_TO_HOLD):
+                    
+                    # Roll the stimulus index over to the start  
+                    stimuli_trial_index = 0;
+        
+                # Increment the count of trials received    
+                total_trials_received += 1;  
                 
             # Check if the stream data is a start request
-            elif(stimuli_code == Stimuli_Code.START):
+            elif(stimuli_code == Stimuli_Code.REQUEST_START):
                 #TODO: this probably shouldn't happen --> decide what to do
                 pass;
                 
             # Check if the stream data is a restart request
-            elif(stimuli_code == Stimuli_Code.RESTART):
+            elif(stimuli_code == Stimuli_Code.REQUEST_RESTART):
                 #TODO: decide what to do when the interface is requesting a restart
                 #(if this is even necessary)
                 pass;
@@ -335,6 +347,7 @@ def Start():
             #TODO: remove
             #{~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Live view
+            """
             if(live_EEG_index + chunk_size < N_LIVE_SAMPLES):
                 try:
                     live_EEG[live_EEG_index:live_EEG_index+chunk_size,:] = EEG_chunk[:,:-1];
@@ -358,6 +371,7 @@ def Start():
                     plt.plot(np.arange(0,5,1/SAMPLING_FREQUENCY), np.concatenate((live_EEG[live_EEG_index:,ch],live_EEG[:live_EEG_index,ch])));
                 plt.show();
                 plot_time = time.time();
+            """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
             
             # Grab the indices of the first trial start, if any exist
@@ -463,7 +477,8 @@ def Start():
                                          
                 print(EEG_epoch_index);
                 print(EEG_samples[:200,-1]);
-                print(stimuli_trial_data[EEG_epoch_index-4:EEG_epoch_index+5,-1]);
+                print(stimuli_trial_data[EEG_epoch_index-10:EEG_epoch_index,-1]);
+                print(stimuli_trial_data[EEG_epoch_index:EEG_epoch_index+10,-1]);
                   
                 # Raise error
                 raise RuntimeError("Cyton/BCI desynchronization detected.");
@@ -533,6 +548,136 @@ def Start():
                 EEG_sample_index = 0;
                    
             # End of Construct_Epoch()
+            pass;
+            
+        """
+        #TODO: docstring        
+        """
+        def Initialize_Classifier():
+            
+            nonlocal overlay_classifiers, overlay_target_means, overlay_target_cov, overlay_target_mvn, overlay_non_target_means, overlay_non_target_cov, overlay_non_target_mvn;
+            
+            console.info("Initializing classifier...");
+                                 
+            # Declare classifiers
+            overlay_classifiers = np.zeros((CORRELATION_DEGREE,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            
+            # Declare correlation coefficients
+            target_coefficients = np.empty((CORRELATION_DEGREE, N_TRAINING_TARGETS));
+            non_target_coefficients = np.empty((CORRELATION_DEGREE, N_TRAINING_NON_TARGETS));
+            
+            # 0th degree classifier is just the average target signal
+            overlay_classifiers[0,:,:] = np.sum(target_epochs, axis=0) / len(target_epochs);
+    
+            # 0th degree correlation data is the uncorrelated data                    
+            target_data = target_epochs;
+            non_target_data = non_target_epochs;
+    
+            # Initialize a classifier for each degree of correlation
+            for order in range(CORRELATION_DEGREE):
+            
+                # Normalize the previous degree's correlation
+                overlay_classifiers[order,:,:] /= np.linalg.norm(overlay_classifiers[order,:,:], axis=0, ord=3);
+                
+                # Initialize output of this degree's correlation per sample
+                next_target_data = np.zeros((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+                next_non_target_data = np.zeros((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            
+                # For each target trial
+                for target_index in range(N_TRAINING_TARGETS):
+                    
+                    # Normalize the trial
+                    target_data[target_index,:,:] /= np.linalg.norm(target_data[target_index,:,:], axis=0, ord=3);
+            
+                    # Initialize the correlation coefficient
+                    coefficient = 0;
+                    
+                    # For each eeg channel
+                    for channel in range(N_EEG_CHANNELS):
+                    
+                        # Increment the correlation coefficient by the result of the channel's correlation coefficient
+                        coefficient += np.correlate(overlay_classifiers[order,:,channel],target_data[target_index,:,channel]);   
+                        
+                        # Calculate the cross correlation of the trial with the current degree of the classifier
+                        corr = np.correlate(overlay_classifiers[order,:,channel],target_data[target_index,:,channel],"same");      
+                        
+                        # Store the cross correlation result for the next degree
+                        next_target_data[target_index,:,channel] = corr;            
+                        
+                        # Increment the next degree's classifier by the cross correlation result
+                        if(order+1<CORRELATION_DEGREE):
+                            overlay_classifiers[order+1,:,channel] += corr;
+                    
+                    # Calculate the average per-channel correlation coefficient
+                    target_coefficients[order,target_index] = coefficient/N_EEG_CHANNELS;
+                    
+                # Calculate the average per-target correlation result for this degree
+                if(order+1<CORRELATION_DEGREE):
+                    overlay_classifiers[order+1,:,:] /= N_TRAINING_TARGETS;                    
+                
+                # For each non-target trial
+                for non_target_index in range(N_TRAINING_NON_TARGETS):
+                    
+                    # Normalize the trial
+                    non_target_data[non_target_index,:,:] /= np.linalg.norm(non_target_data[non_target_index,:,:], axis=0, ord=3);
+                    
+                    # Initialize the correlation coefficient
+                    coefficient = 0;
+                    
+                    # For each eeg channel
+                    for channel in range(N_EEG_CHANNELS):
+                        
+                        # Increment the correlation coefficient by the result of the channel's correlation coefficient
+                        coefficient += np.correlate(overlay_classifiers[order,:,channel],non_target_data[non_target_index,:,channel]);
+                    
+                        # Calculate the cross correlation of the trial with the current degree of the classifier
+                        corr = np.correlate(overlay_classifiers[order,:,channel],non_target_data[non_target_index,:,channel],"same");   
+                    
+                        # Store the cross correlation result for the next degree
+                        next_non_target_data[non_target_index,:,channel] = corr;
+                            
+                    # Calculate the average per-channel correlation coefficient
+                    non_target_coefficients[order,non_target_index] = coefficient/N_EEG_CHANNELS;
+                    
+                # Plot a histogram for the non-target and target distributions
+                plt.subplot(2,2,order+1);
+                _, nt_bins, _ = plt.hist(non_target_coefficients[order,:], alpha=0.5);
+                _, t_bins, _ = plt.hist(target_coefficients[order,:], alpha=0.5);    
+                        
+                # Generate x axis
+                x = np.arange(np.min(non_target_coefficients[order,:]),np.max(target_coefficients[order,:]),0.01);
+                
+                # Plot a 1-d target pdf
+                target_mvn = MVN(mean = np.mean(target_coefficients[order,:]), cov = np.std(target_coefficients[order,:])**2);
+                plt.plot(x,target_mvn.pdf(x)*N_TRAINING_TARGETS*(t_bins[1]-t_bins[0]));  
+                   
+                # Plot a 1-d non-target pdf
+                non_target_mvn = MVN(mean = np.mean(non_target_coefficients[order,:]), cov = np.std(non_target_coefficients[order,:])**2);
+                plt.plot(x,non_target_mvn.pdf(x)*N_TRAINING_NON_TARGETS*(nt_bins[1]-nt_bins[0]));  
+                   
+                # Set the next degree's data as the output from this degree
+                target_data = next_target_data;
+                non_target_data = next_non_target_data;
+                
+            # Calculate the training statistics
+            overlay_target_means = np.mean(target_coefficients, axis=1);
+            overlay_target_cov = np.cov(target_coefficients);
+            overlay_non_target_means = np.mean(non_target_coefficients, axis=1);
+            overlay_non_target_cov = np.cov(non_target_coefficients);
+
+            # Save the pre-trained classifier
+        
+            np.save("classifiers.npy", overlay_classifiers);
+            np.save("target_means.npy", overlay_target_means);
+            np.save("target_cov.npy", overlay_target_cov);
+            np.save("non_target_means.npy", overlay_non_target_means);
+            np.save("non_target_cov.npy", overlay_non_target_cov);
+
+            # Generate normal distributions from the training statistics
+            overlay_target_mvn = MVN(mean = overlay_target_means, cov = overlay_target_cov);
+            overlay_non_target_mvn = MVN(mean = overlay_non_target_means, cov = overlay_non_target_cov);
+       
+            # End of Initialize_Classifier()
             pass;
     
         """
@@ -607,68 +752,61 @@ def Start():
         #TODO: Calculate_Correlation_Coefficients() docstring
         def Calculate_Correlation_Coefficients(normalized_epoch):
             
-            nonlocal mwms_classifier;
+            
+            #TODO: comments
             
             correlation_coefficients = np.zeros(CORRELATION_DEGREE);
             
-            last_tier_data = normalized_epoch;
-            
-            classifier_width = SAMPLES_PER_EPOCH;
-            
-            #TODO: the last degree doesn't need a "full" correlation, only the central coefficient
-            for degree in range(CORRELATION_DEGREE):
+            current_data = normalized_epoch;
+            next_data = np.empty((SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
                 
-                tier_data = np.zeros((classifier_width*2-1,N_EEG_CHANNELS));
-            
-                correlation_coefficient = 0;
-            
+            for order in range(CORRELATION_DEGREE):
+                
+                current_data[:,:] /= np.linalg.norm(current_data[:,:], axis=0, ord=3);
+                
                 for channel in range(N_EEG_CHANNELS):
                     
-                    tier_data[:,channel] = np.correlate(mwms_classifier[degree,:classifier_width,channel],last_tier_data[:,channel],"full");
+                    correlation_coefficients[order] += np.correlate(overlay_classifiers[order,:,channel],current_data[:,channel]);    
                     
-                    correlation_coefficient += tier_data[classifier_width,channel];
-            
-                correlation_coefficients[degree] = correlation_coefficient / N_EEG_CHANNELS;
+                    next_data[:,channel] = np.correlate(overlay_classifiers[order,:,channel],current_data[:,channel], "same"); 
+
+                correlation_coefficients[order] /= 8;
                 
-                classifier_width *= 2;
-                classifier_width -= 1;
-                
-                last_tier_data = tier_data
-                last_tier_data[:classifier_width,:] = last_tier_data[:classifier_width,:]/np.linalg.norm(last_tier_data[:classifier_width,:],axis=0);
-            
+                current_data = next_data;
+        
             return correlation_coefficients;
         
+            # End of Calculate_Correlation_Coefficients()
+            pass;
+            
         #TODO: Calculate_Trial_Probability() docstring
         def Calculate_Trial_Probability(correlation_coefficients):         
-    
-        
-            #TODO: make a more permanent solution to this
-            flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 1)
-            n_per_flash = len(flashed);            
-            not_flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == -1);
-            n_not_used = len(not_flashed);
-            NON_TARGET_MULTIPLIER = (N_STREAM_ELEMENTS-1-n_not_used)/(n_per_flash)-1 #100/10 - 1;
-        
-            # Generate an independent probability (density) that this trial was a non-target trial
-            trial_non_target_probability = non_target_mvn.pdf(correlation_coefficients);
-            trial_non_target_probability *= NON_TARGET_MULTIPLIER;
-                        
-            # Generate an independent probability (density) that this trial was a target trial
-            trial_target_probability = target_mvn.pdf(correlation_coefficients);
             
+            # Get the number per flash
+            flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 1);
+            n_per_flash = len(flashed);  
+            
+            # Get the number not flashed
+            not_flashed = np.where(stimuli_trial_data[EEG_epoch_index,:-1] == 0);
+            n_not_flashed = len(not_flashed);
+            
+            # Get the number used
+            n_used = n_per_flash + n_not_flashed;
+            
+            # Generate an independent probability (density) that this trial was a target trial
+            trial_target_probability = overlay_target_mvn.pdf(correlation_coefficients)*n_per_flash/n_used;
+            
+            # Generate an independent probability (density) that this trial was a non-target trial
+            trial_non_target_probability = overlay_non_target_mvn.pdf(correlation_coefficients)*n_not_flashed/n_used;
+                                              
             # Normalize the generated probability densities
             p_space = trial_target_probability + trial_non_target_probability;
             
-            #trial_non_target_probability /= p_space; # = 1-target
-            trial_target_probability /= p_space;
-            
-            console.info(str(correlation_coefficients)+"\n"+
-                         str(target_means)+"\n"+
-                         str(non_target_means)+"\n"+
-                         str(1-trial_target_probability)+"|"+str(trial_target_probability)+"\n"+
-                         str((stimuli_trial_data[EEG_epoch_index,40])));
-            
-            return trial_target_probability;
+            # Return the normalized target probability
+            return trial_target_probability/p_space;
+        
+            # End of Calculate_Trial_Probability()
+            pass;
         
         #TODO: Update_Probabilities docstring()
         def Update_Probabilities(trial_probability): 
@@ -693,11 +831,13 @@ def Start():
             cell_probabilities[:] = cell_probabilities[:]/np.sum(cell_probabilities);
             
             # Weight previous probabilities
-            cell_probabilities[:] = old_probabilities[:] * 0.5 + cell_probabilities[:] * 0.5;
+            #TODO: determine weighting coefficient
+            cell_probabilities[:] = old_probabilities[:] * 0.15 + cell_probabilities[:] * 0.85;
 
             most_probable_cell = np.argmax(cell_probabilities);         
-            console.warning(str(most_probable_cell)+": "+str(np.amax(cell_probabilities))+"\n"+str(cell_probabilities));
+            #console.warning(str(most_probable_cell)+": "+str(np.amax(cell_probabilities))+"\n"+str(cell_probabilities));
             
+            # End of Update_Probabilities()
             pass;
             
         #TODO: Broadcast_Classification_Status() docstring
@@ -718,10 +858,10 @@ def Start():
                 # (offset by 1 then multiply by -1 as per scheme)           
                 res = np.zeros(N_STREAM_ELEMENTS); # processor code = 0 --> classification
                 res[most_probable_cell] = 1;
-                processor_outlet.push_sample(res);
+                processor_outlet.push_sample(res);    
                 
-                raise KeyboardInterrupt("test");
-                
+                console.debug(cell_probabilities);
+                console.debug(most_probable_cell);
             
             # Else, a classification is not ready
             else:
@@ -739,6 +879,7 @@ def Start():
                 
                 processor_outlet.push_sample(res);
                     
+            # End of Broadcast_Classification_Status()
             pass;
             
         ##########################
@@ -765,8 +906,12 @@ def Start():
         #   Initialize processor constants   #
         ######################################
         
-        # Define the degree of iterative correlation to perform
-        CORRELATION_DEGREE = 3;
+        #TODO: comment these        
+        N_TRAINING_TARGETS = 300;
+        N_TRAINING_NON_TARGETS = ceil(N_TRAINING_TARGETS*((N_TILES/N_TILES_PER_FLASH)-1));
+        CORRELATION_DEGREE = 4;        
+        FILTER_SETTLING_TIME = 20;
+        CYTON_SETTLING_TIME = 5;
         
         # Define the maximum amount of parsed data, in seconds, to hold in RAM
         HOLDING_TIME = 120;
@@ -790,8 +935,11 @@ def Start():
         #   Initialize processor variables   #
         ######################################
         
+        # Track the processor's current mode
+        processor_mode = None;
+        
         # Track whether the processor is waiting for the first trial of the new classification
-        waiting_start_new_classification = True;
+        waiting_start_new_classification = False;
         
         ################################
         #   Initialize EEG variables   #
@@ -809,7 +957,7 @@ def Start():
         
         # Initialize current EEG epoch index to 0
         EEG_epoch_index = 0;
-        
+            
         # Count the total number of epochs received from the Cyton
         # (in order to compare with the total number of trials received from the BCI)
         total_epochs_received = 0;
@@ -846,18 +994,7 @@ def Start():
         total_trials_received = 0;
         #TODO: trim this in accordance with total_epochs_received to prevent them from becoming annoyingly large
         #TODO: detect large gaps between this and total_epochs_received (to allow one to catch up)
-            
-        #################################################
-        #   Load pretrained classifier and statistics   #
-        #################################################
-        mat_dict = LoadMAT("classifier_data.mat");
-        
-        mwms_classifier = np.array(mat_dict['mwms_classifier']);
-        non_target_means = np.reshape(np.array(mat_dict['non_target_means']),(CORRELATION_DEGREE));
-        non_target_cov = np.array(mat_dict['non_target_cov']);
-        target_means = np.reshape(np.array(mat_dict['target_means']),(CORRELATION_DEGREE));
-        target_cov = np.array(mat_dict['target_cov']);
-                
+                                    
         # Initialize cell probabilities
         #TODO: make sure this is okay
         cell_probabilities = np.ones(N_STREAM_ELEMENTS-1)/(N_STREAM_ELEMENTS-1);
@@ -865,11 +1002,7 @@ def Start():
         # Initialize threshold values
         #TODO: initialize dynamically
         cell_thresholds = DEFAULT_THRESHOLD * np.ones(N_STREAM_ELEMENTS-1);
-        
-        # Define the non target and target distributions
-        non_target_mvn = MVN(mean = non_target_means, cov = non_target_cov);
-        target_mvn = MVN(mean = target_means, cov = target_cov);
-        
+                
         ##################################
         #   Synchronize start with BCI   #
         ##################################
@@ -884,7 +1017,7 @@ def Start():
             if(stimulus_input is not None):
                 
                 # Check if the received signal is the start request
-                if(stimulus_input[-1] == Stimuli_Code.START):
+                if(stimulus_input[-1] == Stimuli_Code.REQUEST_START):
                     
                     # Exit the blocking loop
                     break;
@@ -907,14 +1040,82 @@ def Start():
         # Discard the setup chunk
         # (this setup chunk will contain the FTDI turning on prior to the pins stabalizing --> we want to throw this out)
         EEG_inlet.pull_chunk(0.0);
-    
-        # Send the start signal to the BCI
-        console.info("Sending start signal to BCI.");
-        start_signal = np.empty(N_STREAM_ELEMENTS);
-        start_signal[-1] = Processor_Code.START;
-        processor_outlet.push_sample(start_signal);
-        filter_start_time = time.time();
+
+        # Check to see if pre-trained data is available to initialize a classifier
+        try:
         
+            ###########################################
+            #   Load pre-trained overlay classifier   #
+            ###########################################
+        
+            overlay_classifiers = None;
+            overlay_target_means = None;
+            overlay_target_cov = None;
+            overlay_target_mvn = None;
+            overlay_non_target_means = None;
+            overlay_non_target_cov = None;
+            overlay_non_target_mvn = None;
+        
+            # Try to pull pre-trained overlay MWMS classifiers
+            # (correlation_degree x n_samples_per_epoch x n_channels)
+            overlay_classifiers = np.load("classifiers.npy");
+            
+            # If the pre-trained degree is less than the declared degree, treat these classifiers as insufficient
+            if(len(overlay_classifiers) < CORRELATION_DEGREE):
+                raise FileNotFoundError();
+            # Else, trim off excess correlation degrees
+            else:
+                overlay_classifiers = overlay_classifiers[:CORRELATION_DEGREE,:,:];
+            
+            # Load the pre-trained statistics for the overlay classifier
+            overlay_target_means = np.load("target_means.npy");
+            overlay_target_cov = np.load("target_cov.npy");
+            overlay_non_target_means = np.load("non_target_means.npy");
+            overlay_non_target_cov = np.load("non_target_cov.npy");
+
+            # Define the overlay non target and target distributions
+            overlay_non_target_mvn = MVN(mean = overlay_non_target_means, cov = overlay_non_target_cov);
+            overlay_target_mvn = MVN(mean = overlay_target_means, cov = overlay_target_cov);
+        
+            # Set the processor mode
+            processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
+            
+            # Send the BCI a signal to start in classification mode
+            console.info("Sending classification-start signal to BCI.");
+            start_signal = np.empty(N_STREAM_ELEMENTS);
+            start_signal[-1] = Processor_Code.START_CLASSIFICATION;
+            processor_outlet.push_sample(start_signal);
+            
+            # Start a timer to ensure the filter initializes before collecting data
+            filter_start_time = time.time();
+            
+        # Else, there is no training data available; training is needed
+        except FileNotFoundError:
+            
+            #####################################
+            #   Initialize training variables   #
+            #####################################
+            
+            # Initialize target training epoch array
+            target_epochs = np.empty((N_TRAINING_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            target_epochs_received = 0;
+            
+            # Initialize non-target training epoch array
+            non_target_epochs = np.empty((N_TRAINING_NON_TARGETS,SAMPLES_PER_EPOCH,N_EEG_CHANNELS));
+            non_target_epochs_received = 0;
+        
+            # Set the processor mode
+            processor_mode = Processor_Mode.TRAINING_OVERLAY;
+            
+            # Send the BCI a signal to start in training mode
+            console.info("Sending training-start signal to BCI.");
+            start_signal = np.empty(N_STREAM_ELEMENTS);
+            start_signal[-1] = Processor_Code.START_TRAINING;
+            processor_outlet.push_sample(start_signal);
+            
+            # Start a timer to ensure the filter initializes before collecting data
+            filter_start_time = time.time();
+                    
         ###########################
         #   Main Processor Loop   #
         ###########################
@@ -932,7 +1133,7 @@ def Start():
                             
                 # Appropriately handle the stimulus input
                 Handle_Incoming_Stimulus(stimulus_input);
-                            
+                                            
             #########################
             #   Handle EEG stream   #
             #########################
@@ -943,7 +1144,7 @@ def Start():
                 
                 # Appropriately handle the chunk
                 Handle_Incoming_EEG_Chunk(np.array(EEG_chunk));
-        
+                
             ####################
             #   Handle Epoch   #
             ####################
@@ -951,47 +1152,121 @@ def Start():
             # Check if there are enough EEG samples to construct a complete epoch
             # and that the corresponding stimulus data has already been collected
             if(EEG_sample_index > SAMPLES_PER_EPOCH and total_trials_received > total_epochs_received):
-        
+                
+                # Ensure that the streams have not de-synced
                 Synchronize_Streams();
                 
+                # Pull the epoch from the EEG samples and trim the EEG samples appropriately
                 Construct_Epoch();
         
                 #############################
                 #   Handle Training Epoch   #
                 #############################
-                
-                #TODO: this
-                
+                                                       
+                # Check if this epoch is a training epoch
+                if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.TRAINING):
+                                        
+                    # Validate that training data was expected
+                    if(processor_mode != Processor_Mode.TRAINING_KEYBOARD and processor_mode != Processor_Mode.TRAINING_OVERLAY):
+                    
+                        # Check if the program is still waiting for a new classification to start
+                        if(not waiting_start_new_classification):
+                            console.warning("Received training data when not expected.");              
+                                                
+                    # Validate that the filter is settled
+                    elif(time.time()-filter_start_time > FILTER_SETTLING_TIME):
+                    
+                        # Normalize the epoch by channel
+                        normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.linalg.norm(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
+                        
+                        # Check if target key was flashed (code = 3)
+                        if(3 in stimuli_trial_data[EEG_epoch_index,:-1]):
+                            
+                            # Check if more target epochs are needed
+                            if(target_epochs_received < N_TRAINING_TARGETS):
+                                # Add this epoch to the target training set
+                                target_epochs[target_epochs_received,:,:] = normalized_epoch;
+                                target_epochs_received += 1;
+                        
+                        # Check if this epoch is a non-target epoch and more non-target epochs are needed
+                        # Else, check if target key was not flashed (code = 2)
+                        elif(2 in stimuli_trial_data[EEG_epoch_index,:-1]):
+                            
+                            # Check if more non-target epochs are needed
+                            if(non_target_epochs_received<N_TRAINING_NON_TARGETS):
+                                # Add this epoch to the non-target training set
+                                non_target_epochs[non_target_epochs_received,:,:] = normalized_epoch;
+                                non_target_epochs_received += 1;
+                            
+                        # Else, no target key was found in the training data
+                        else:
+                            
+                            raise RuntimeError("No target key found in training data.");
+                            
+                        # Check if the training limit has been reached
+                        if(target_epochs_received==N_TRAINING_TARGETS and non_target_epochs_received==N_TRAINING_NON_TARGETS):
+                            
+                            # Save training data (for testing purposes)
+                            np.save("targets.npy", target_epochs);
+                            np.save("non_targets.npy", non_target_epochs);
+                            
+                            # Initialize classifier
+                            Initialize_Classifier();                            
+                            
+                            # Switch the processor to overlay classification mode
+                            processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
+                            
+                            # Flag that the processor is waiting for a new classification trial
+                            waiting_start_new_classification = True;
+                            
+                            # Send the BCI a signal to start in classification mode
+                            console.info("Sending classification-start signal to BCI.");
+                            start_signal = np.empty(N_STREAM_ELEMENTS);
+                            start_signal[-1] = Processor_Code.START_CLASSIFICATION;
+                            processor_outlet.push_sample(start_signal);
+                            
+                        elif(target_epochs_received%(N_TRAINING_TARGETS/20) == 0 ):
+                            
+                            console.debug(100*target_epochs_received/N_TRAINING_TARGETS);
+                            console.warning(100*non_target_epochs_received/N_TRAINING_NON_TARGETS);
+
                 ###################################
                 #   Handle Classification Epoch   #
                 ###################################
         
-                # Check if this epoch is the first trial of a new classification
-                if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
-                            
-                    # Handle classification start
-                    Start_New_Classification();
-                    
-                # Check if data being streamed is for the current classification
-                if(not waiting_start_new_classification):
-                    
-                    # Normalize the epoch by channel
-                    normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.linalg.norm(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
-                    
-                    # Calculate the correlation coefficients
-                    correlation_coefficients = Calculate_Correlation_Coefficients(normalized_epoch); 
-                    
-                    # Calculate trial probability
-                    trial_probability = Calculate_Trial_Probability(correlation_coefficients);
-                    
-                    # Update cell probabilities
-                    if(time.time()-filter_start_time > 20):
-                        Update_Probabilities(trial_probability);
-                    
-                    #TODO: calculate the probability that the user was looking at the screen at all
-                    
-                    # Broadcast classification status
-                    Broadcast_Classification_Status();
+                # Else, the epoch is a classification epoch
+                else:
+                                
+                    # Validate that there is a classifier
+                
+                    # Check if this epoch is the first trial of a new classification
+                    if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
+                                
+                        # Handle classification start
+                        Start_New_Classification();
+                        
+                    # Check if data being streamed is for the current classification
+                    if(not waiting_start_new_classification):
+                        
+                        # Normalize the epoch by channel
+                        normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.linalg.norm(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
+                        
+                        # Calculate the correlation coefficients
+                        correlation_coefficients = Calculate_Correlation_Coefficients(normalized_epoch); 
+                        
+                        # Calculate trial probability
+                        trial_probability = Calculate_Trial_Probability(correlation_coefficients);
+                        
+                        # Update cell probabilities
+                        #TODO: un-ghetto-ify this
+                        if(time.time()-filter_start_time > FILTER_SETTLING_TIME):
+                           Update_Probabilities(trial_probability);
+                           pass;
+                        
+                        #TODO: calculate the probability that the user was looking at the screen at all
+                        
+                        # Broadcast classification status
+                        Broadcast_Classification_Status();
                     
                 #######################################
                 #   Update variables for next epoch   #
@@ -1036,8 +1311,7 @@ def Start():
             
         # Specify the inlet (resolve_byprop returns a list object of inlets)
         stimuli_inlet = StreamInlet(inlet_stream[0]);     
-        console.info("P300_Stimuli stream resolved.");
-        
+        console.info("P300_Stimuli stream resolved.");        
         
         # Grab an inlet to the EEG stream
         console.info("Resolving Packaged_EEG stream...");

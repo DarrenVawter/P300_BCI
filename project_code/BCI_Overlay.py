@@ -17,9 +17,7 @@ import logging; # print pretty console logs
 # Internal Modules
 from BCI_Enumerations import Program_Interaction, PC_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
-from BCI_Constants import BLACK, GRAY, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
-#TODO: swap these out (later, because it will generate annoying warnings)
-#from BCI_Constants import *; # pull constants from header
+from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_TILE_ROWS, N_TILE_COLUMNS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 ###########################################################
 #   Dislpay the screen overlay and run the P300 Speller   #
@@ -303,6 +301,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     # Number of flash images to pull from
     N_FLASH_IMAGES = 10;
     
+    # Time, in seconds, per training target
+    TARGET_TIME = 12;
+    
     # Calculate the dimensions of the overlay portion of the screen
     OVERLAY_WIDTH = round(SCREEN_WIDTH*(1-1/N_TILE_COLUMNS));
     OVERLAY_HEIGHT = round(SCREEN_HEIGHT*(1-1/N_TILE_ROWS));
@@ -322,7 +323,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
     for i in range(N_FLASH_IMAGES):
         FLASH_IMAGES[i] = pygame.image.load('league_icons/'+str(i)+'.jpg')
-        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH, TILE_HEIGHT));
+        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH*3/4, TILE_HEIGHT*3/4));
         
     # Load and scale interaction icons
     BCI_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
@@ -360,15 +361,20 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Initialize flash timer to track how long a group has been flashed for
     flash_timer = 0;
-    
+       
     # Most recent probability of each tile
     tile_probabilities = np.ones((N_TILES,1))/N_TILES;
         
     # Tiles that are currently being flashed
     current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
     
+    #TODO: change dynamically with a timer
+    
     # Tiles that have not yet been flashed as part of the current set    
     flash_bucket = np.arange(N_TILES);
+    
+    # Initialize training target key ID
+    target_tile = np.random.choice(flash_bucket);  
     
     # Set of tiles that are not used within the grid
     exclude_bucket = [];
@@ -388,8 +394,11 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Define start request signal to send until processor acknowledges receipt by signaling back to start
     start_request = np.empty(N_STREAM_ELEMENTS).astype(int);
-    start_request[-1] = Stimuli_Code.START;
+    start_request[-1] = Stimuli_Code.REQUEST_START;
     
+    # Initialize the mode to classification mode
+    training_mode = False;
+                
     # Wait for processor to acknowledge the connection by requesting start
     #TODO: consider adding a maximum timeout to this
     console.info("Waiting to receive start signal from processor...");
@@ -404,10 +413,31 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         if(processor_input is not None):
 
             # Verify that the input is a start signal
-            if(processor_input[-1] == Processor_Code.START):
+            if(processor_input[-1] == Processor_Code.START_TRAINING):
+                            
+                console.warning("Starting in training mode.");
+                
+                # Start the overlay in training mode
+                training_mode = True;
+                # Initialize the target timer to track how long the current target has been selected
+                target_timer = 0;
+                
+                # Exit blocking loop
+                break;
+                
+            elif(processor_input[-1] == Processor_Code.START_CLASSIFICATION):
                                 
+                console.warning("Starting in classification mode.");
+                
                 # Set flag to show that next trial is the start of a new classification
-                start_new_classification = True;
+                start_new_classification = False;
+                
+                # Remove the target key
+                target_tile = -1;
+                # Initialize the target timer to track how long the current target has been selected
+                target_timer = time.time();
+                
+                # Exit blocking loop
                 break;
                 
             # Else, the received signal was not a start
@@ -458,7 +488,35 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             processor_code = Processor_Code(processor_input[-1]);
             
             # Check if input is a probability update
-            if(processor_code == Processor_Code.PROBABILITY_UPDATE):
+            if(processor_code == Processor_Code.START_CLASSIFICATION):
+
+                # Check if currently in training mode
+                if(training_mode):
+                    
+                    console.warning("Switching to classification mode.");
+                
+                    # Reset tile probabilities
+                    tile_probabilities = np.ones((N_TILES,1))/N_TILES;
+                    
+                    # Reset the bucket        
+                    flash_bucket = np.arange(N_TILES);
+                
+                    # Remove the target tile
+                    target_tile = -1;
+                
+                    # Flag to start new tile classification
+                    start_new_classification = True;
+                    
+                    # Exit training mode
+                    training_mode = False;
+                
+                # Else, in classification mode
+                else:
+                    #Handle this
+                    raise RuntimeError("Start classification signal received while in classification mode.");
+                
+            # Check if input is a probability update
+            elif(processor_code == Processor_Code.PROBABILITY_UPDATE):
                         
                 # Update tile probabilities
                 tile_probabilities = processor_input[:N_TILES]; 
@@ -471,7 +529,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                                                 
                 # Find the id of the classified tile
                 classification_id = np.where(processor_input[:-1] == 1)[0][0];
-                                
+                console.info(classification_id);
+                
                 # Check if classified tile is an overlay control option
                 if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
@@ -590,70 +649,103 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
             # Pick the next flash group
             Choose_Flash_Tiles();
-                        
-            # Form output array
-                # -1 --> unused cell
-                # 0 --> used cell, not flashed this trial
-                # 1 --> used cell, flashed this trial
-            # Initialize output array to all zeros
-            stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
-            # Set unused cells to -1
-            stimuli_data[N_TILES:] = -1;
-            # Set excluded cells to -1
-            stimuli_data[exclude_bucket] = -1;
-            # Set flashed cells to 1
-            stimuli_data[current_flash_group] = 1;
             
-            #TODO: add DRBG back in to determine if the trial was a sync trial
-            # For now, call any trial that flashes tile 0 a sync trial
-            BCI_sync_code = stimuli_data[0];
+            # Check if in training mode
+            if(training_mode):
             
-            # Append the trial's sync code to the array and send relevant data to processor & UM232R
-                        
-            # Check if the trial is the first trial of a new classification
-            if(start_new_classification):
-                
-                # Check if trial is a sync trial
-                if(BCI_sync_code):
-                    
-                    # Trial is the start of a new classification but is a not a sync trial
-                    stimuli_data[-1] = Stimuli_Code.SYNC_START;
-                    
+                # Form output array
+                    # -1 --> cell was not used at all
+                    # 0  --> cell was not flashed, cell is not the target of the trial
+                    # 1  --> cell was flashed, cell is not the target of the trial
+                    # 2  --> cell was not flashed, cell is the target of the trial
+                    # 3  --> cell was flashed, cell is the target of the trial  
+                # Initialize output array to all zeros
+                stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
+                # Set unused cells to -1
+                stimuli_data[N_TILES:] = -1;
+                # Set excluded cells to -1
+                stimuli_data[exclude_bucket] = -1;
+                # Set flashed cells to 1
+                stimuli_data[current_flash_group] = 1;
+                # Check if the target key was flashed
+                if(target_tile in current_flash_group):
+                    stimuli_data[target_tile] = 3;
                     # Send the UM232R a sync pulse
                     UM232R.Send_Sync();
-                    
-                # Else, trial is not a sync trial
                 else:
-                    
-                    # Trial is the start of a new classification but is a not a sync trial
-                    stimuli_data[-1] = Stimuli_Code.NON_SYNC_START;
-                    
-                    # Send the UM232R a non-sync pulse
-                    UM232R.Send_Non_Sync();
-                    
-                # Reset new classification flag
-                start_new_classification = False;
-                
-            # Else, the trial is not the first trial of a new classification
+                    stimuli_data[target_tile] = 2;   
+                    # Send the UM232R a sync pulse
+                    UM232R.Send_Non_Sync();                 
+            
+                # Append the training stimuli code to the trial
+                stimuli_data[-1] = Stimuli_Code.TRAINING;
+                        
+            # Else, in classification mode
             else:
+                    
+                # Form output array
+                    # -1 --> unused cell
+                    # 0 --> used cell, not flashed this trial
+                    # 1 --> used cell, flashed this trial
+                # Initialize output array to all zeros
+                stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
+                # Set unused cells to -1
+                stimuli_data[N_TILES:] = -1;
+                # Set excluded cells to -1
+                stimuli_data[exclude_bucket] = -1;
+                # Set flashed cells to 1
+                stimuli_data[current_flash_group] = 1;
+            
+                #TODO: add DRBG back in to determine if the trial was a sync trial
+                # For now, call any trial that flashes tile 0 a sync trial
+                BCI_sync_code = stimuli_data[0];
                 
-                # Check if trial is a sync trial
-                if(BCI_sync_code):
+                # Append the trial's sync code to the array and send relevant data to processor & UM232R
+                            
+                # Check if the trial is the first trial of a new classification
+                if(start_new_classification):
                     
-                    # Trial is not the start of a new classification but is a sync trial                
-                    stimuli_data[-1] = Stimuli_Code.SYNC;
-                    
-                    # Send the UM232R a sync pulse
-                    UM232R.Send_Sync();
+                    # Check if trial is a sync trial
+                    if(BCI_sync_code):
                         
-                # Else, trial is not a sync trial
+                        # Trial is the start of a new classification but is a not a sync trial
+                        stimuli_data[-1] = Stimuli_Code.SYNC_START;
+                        
+                        # Send the UM232R a sync pulse
+                        UM232R.Send_Sync();
+                        
+                    # Else, trial is not a sync trial
+                    else:
+                        
+                        # Trial is the start of a new classification but is a not a sync trial
+                        stimuli_data[-1] = Stimuli_Code.NON_SYNC_START;
+                        
+                        # Send the UM232R a non-sync pulse
+                        UM232R.Send_Non_Sync();
+                        
+                    # Reset new classification flag
+                    start_new_classification = False;
+                    
+                # Else, the trial is not the first trial of a new classification
                 else:
                     
-                    # Trial is not the start of a new classification and is a not a sync trial                
-                    stimuli_data[-1] = Stimuli_Code.NON_SYNC;
-                    
-                    # Send the UM232R a non-sync pulse
-                    UM232R.Send_Non_Sync();
+                    # Check if trial is a sync trial
+                    if(BCI_sync_code):
+                        
+                        # Trial is not the start of a new classification but is a sync trial                
+                        stimuli_data[-1] = Stimuli_Code.SYNC;
+                        
+                        # Send the UM232R a sync pulse
+                        UM232R.Send_Sync();
+                            
+                    # Else, trial is not a sync trial
+                    else:
+                        
+                        # Trial is not the start of a new classification and is a not a sync trial                
+                        stimuli_data[-1] = Stimuli_Code.NON_SYNC;
+                        
+                        # Send the UM232R a non-sync pulse
+                        UM232R.Send_Non_Sync();
                     
             # Send the flash data to the processor
             stimuli_outlet.push_sample(stimuli_data);
@@ -713,38 +805,112 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Renderthe appropriate BCI control icon
             canvas.blit(OVERLAY_INTERACTION_ICONS[i],[round((i+0.5)*TILE_WIDTH-OVERLAY_ICON_WIDTH[i]/2), round((N_TILE_ROWS-0.5)*TILE_HEIGHT-OVERLAY_ICON_HEIGHT[i]/2), OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]]);       
         
-        ######################################################
-        #   Render flash images over the appropriate tiles   #
-        ######################################################
+        # Check the target timer
         
-        # Iterate over the tiles in the flash group
-        for i in range(N_TILES_PER_FLASH):
+        if(time.time()-target_timer < TARGET_TIME):
+        
+            #################################
+            #   Highlight the target tile   #
+            #################################
+                        
+            if(target_tile >= 0):
+                
+                # Get the tile's row
+                row = floor(target_tile / N_TILE_COLUMNS);
+                
+                # Get the tile's column
+                col = target_tile % N_TILE_COLUMNS;
+                
+                # Render the flash images border
+                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
+                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                
+            # Else, continually reset the target timer 
+            else:
+                target_timer = time.time();
+                
+            ######################################################
+            #   Render flash images over the appropriate tiles   #
+            ######################################################
             
-            # Get the tile's row
-            row = floor(current_flash_group[i] / N_TILE_COLUMNS);
+            # Iterate over the tiles in the flash group
+            for i in range(N_TILES_PER_FLASH):
+                
+                # Get the tile's row
+                row = floor(current_flash_group[i] / N_TILE_COLUMNS);
+                
+                # Get the tile's column
+                col = current_flash_group[i] % N_TILE_COLUMNS;
+                
+                # Render the flash images border
+                pygame.draw.rect(canvas, WHITE, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                
+                # Render the corresponding flash image
+                canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH+TILE_WIDTH/8, row*TILE_HEIGHT+TILE_HEIGHT/8, TILE_WIDTH*3/4, TILE_HEIGHT*3/4]);      
+        
+            ###################################
+            #   Finalize and draw the frame   #
+            ###################################
             
-            # Get the tile's column
-            col = current_flash_group[i] % N_TILE_COLUMNS;
+            # Render tile boundaries
+            for i in range(N_TILE_COLUMNS):
+                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
+            for i in range(N_TILE_ROWS):
+                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
             
-            # Render the corresponding flash image
-            canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);      
+            # Cap fps
+            clock.tick(FRAMERATE_CAP);
+                   
+            # Display the buffered frame to the screen
+            pygame.display.flip();
         
-        ###################################
-        #   Finalize and draw the frame   #
-        ###################################
-        
-        # Render tile boundaries
-        for i in range(N_TILE_COLUMNS):
-            pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
-        for i in range(N_TILE_ROWS):
-            pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
-        
-        # Cap fps
-        clock.tick(FRAMERATE_CAP);
-               
-        # Display the buffered frame to the screen
-        pygame.display.flip();
-        
+        # Else, reset the target
+        else:
+            
+            ##############################
+            #   Update the target tile   #
+            ##############################
+            
+            # Tiles that have not yet been flashed as part of the current set    
+            flash_bucket = np.arange(N_TILES);
+            
+            # Initialize training target key ID
+            target_tile = np.random.choice(flash_bucket);  
+            
+            if(target_tile >= 0):
+                
+                # Get the tile's row
+                row = floor(target_tile / N_TILE_COLUMNS);
+                
+                # Get the tile's column
+                col = target_tile % N_TILE_COLUMNS;
+                
+                # Render the flash images border
+                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
+                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                
+            ###################################
+            #   Finalize and draw the frame   #
+            ###################################
+            
+            # Render tile boundaries
+            for i in range(N_TILE_COLUMNS):
+                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
+            for i in range(N_TILE_ROWS):
+                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
+            
+            # Cap fps
+            clock.tick(FRAMERATE_CAP);
+                   
+            # Display the buffered frame to the screen
+            pygame.display.flip();
+            
+            # Pause for 0.5 seconds
+            time.sleep(0.5);
+            
+            # Reset the target timer
+            target_timer = time.time();
+                
         ###############################
         #   Check for pygame events   #
         ###############################

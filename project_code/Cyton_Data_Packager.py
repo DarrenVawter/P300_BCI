@@ -56,8 +56,8 @@ def Start():
     sampling_rate = 250;
         
     # Sample scaling    
-    SCALE_FACTOR_EEG = (4500000)/24/(2**23-1) #uV/count
-    SCALE_FACTOR_AUX = 0.002 / (2**4)
+    SCALE_FACTOR_EEG = (4500000)/24/(2**23-1); #uV/count
+    SCALE_FACTOR_AUX = 0.002 / (2**4);
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     

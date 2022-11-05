@@ -68,24 +68,40 @@ class Program_Interaction(IntEnum):
     # Close keyboard interface
     CLOSE_KEYBOARD = 20;
         
+#################################
+#   Enumerate processor modes   #
+#################################
+class Processor_Mode(IntEnum):
+    
+    # Processor is expecting overlay training data
+    TRAINING_OVERLAY = 1;
+    # Processor is expecting keyboard training data
+    TRAINING_KEYBOARD = 2;
+    # Processor is expecting overlay data to classify
+    CLASSIFICATION_OVERLAY = 3;
+    # Processor is expecting keyboard data to classify
+    CLASSIFICATION_KEYBOARD = 4;
+    
 ########################################
 #   Enumerate processor stream codes   #
 ########################################
 class Processor_Code(IntEnum):
     
     # Stream data is a cell classification, cell values are one hot as follows:
-        # 0 --> cell was not flashed
-        # 1 --> cell was flashed
+        # 0 --> cell is not the classification
+        # 1 --> cell is the classification
     CLASSIFICATION = 0; 
     # Stream data is an update to cell probabilities, cell values are the current probabilities
     PROBABILITY_UPDATE = 1;
     
-    # Stream data is telling the interface to start
-    START = -1;
+    # Stream data is telling the interface to start training mode
+    START_TRAINING = -1;
+    # Stream data is telling the interface to start classification mode
+    START_CLASSIFICATION = -2;
     # Stream data is telling the interface to restart
-    RESTART = -2;
+    RESTART = -3;
     # Stream data is announcing that the processor is shutting down
-    PROCESSOR_SHUTDOWN = -3;
+    PROCESSOR_SHUTDOWN = -4;
 
 ######################################
 #   Enumerate stimuli stream codes   #
@@ -93,15 +109,17 @@ class Processor_Code(IntEnum):
 class Stimuli_Code(IntEnum):
     
     # Stream data is a training trial, cell values are as follows:  
-        # 0 --> cell was not flashed, cell is not the target of the trial
-        # 1 --> cell was flashed, cell is not the target of the trial
-        # 2 --> cell was not flashed, cell is the target of the trial
-        # 3 --> cell was flashed, cell is the target of the trial  
+        # -1 --> cell was not used at all
+        # 0  --> cell was not flashed, cell is not the target of the trial
+        # 1  --> cell was flashed, cell is not the target of the trial
+        # 2  --> cell was not flashed, cell is the target of the trial
+        # 3  --> cell was flashed, cell is the target of the trial  
     TRAINING = 0;
     
     # For all of the following 4 codes, cell values are one hot as follows:
-        # 0 --> cell was not flashed
-        # 1 --> cell was flashed
+        # -1 --> cell was not used at all
+        # 0  --> cell was not flashed
+        # 1  --> cell was flashed
     # Stream data is not the start of a new classification and is a not a sync trial
     NON_SYNC = 1;
     # Stream data is not the start of a new classification but is a sync trial
@@ -112,9 +130,9 @@ class Stimuli_Code(IntEnum):
     SYNC_START = 4;
 
     # Stream data is requesting start from the processor
-    START = -1;
+    REQUEST_START = -1;
     # Stream data is requesting a restart from the processor
-    RESTART = -2;
+    REQUEST_RESTART = -2;
     # Stream data is announcing that the BCI is shutting down
     BCI_SHUTDOWN = -3;
     # Stream data is announcing that the interface is shutting down
