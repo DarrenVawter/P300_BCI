@@ -335,8 +335,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     # Load and scale interaction icons
     OVERLAY_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
-    OVERLAY_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75]);
-    OVERLAY_ICON_WIDTH = np.multiply(OVERLAY_ICON_HEIGHT,[1]);
+    OVERLAY_ICON_HEIGHT = TILE_HEIGHT*np.array([0.75, 0.75]);
+    OVERLAY_ICON_WIDTH = np.multiply(OVERLAY_ICON_HEIGHT,[1, 1.33]);
     for i in range(N_OVERLAY_CONTROLS):
         OVERLAY_INTERACTION_ICONS[i] = pygame.image.load('overlay_interaction_icons/'+str(i)+'.png')
         OVERLAY_INTERACTION_ICONS[i] = pygame.transform.scale(OVERLAY_INTERACTION_ICONS[i], (OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]));
@@ -394,7 +394,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     
     # Define start request signal to send until processor acknowledges receipt by signaling back to start
     start_request = np.empty(N_STREAM_ELEMENTS).astype(int);
-    start_request[-1] = Stimuli_Code.REQUEST_START;
+    start_request[-1] = Stimuli_Code.REQUEST_OVERLAY_START;
     
     # Initialize the mode to classification mode
     training_mode = False;
@@ -413,7 +413,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         if(processor_input is not None):
 
             # Verify that the input is a start signal
-            if(processor_input[-1] == Processor_Code.START_TRAINING):
+            if(processor_input[-1] == Processor_Code.START_OVERLAY_TRAINING):
                             
                 console.debug("Starting overlay in training mode.");
                 
@@ -425,12 +425,12 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Exit blocking loop
                 break;
                 
-            elif(processor_input[-1] == Processor_Code.START_CLASSIFICATION):
+            elif(processor_input[-1] == Processor_Code.START_OVERLAY_CLASSIFICATION):
                                 
                 console.debug("Starting overlay in classification mode.");
                 
                 # Set flag to show that next trial is the start of a new classification
-                start_new_classification = False;
+                start_new_classification = True;
                 
                 # Remove the target key
                 target_tile = -1;
@@ -543,6 +543,11 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                         # Revert magnification to full screen
                         #TODO: store the last zoom level and revert to that instead    
                         magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];                       
+                        
+                    # Check if the user switched to keyboard mode
+                    if(program_interaction == Program_Interaction.LAUNCH_KEYBOARD):
+                        
+                        return (program_interaction, None);
                         
                 # Check if classified tile is a BCI control option
                 elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
@@ -799,10 +804,10 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         #   Render the overlay controls   #
         ###################################
                 
-        # Iterate over the BCI control options
+        # Iterate over the overlay control options
         for i in range(N_OVERLAY_CONTROLS):
 
-            # Renderthe appropriate BCI control icon
+            # Renderthe appropriate overlay control icon
             canvas.blit(OVERLAY_INTERACTION_ICONS[i],[round((i+0.5)*TILE_WIDTH-OVERLAY_ICON_WIDTH[i]/2), round((N_TILE_ROWS-0.5)*TILE_HEIGHT-OVERLAY_ICON_HEIGHT[i]/2), OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]]);       
         
         # Check the target timer

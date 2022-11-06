@@ -146,7 +146,7 @@ def Start():
         # TODO: Start_Overlay() docstring
         def Start_Overlay():
             
-            nonlocal overlay_classifiers, overlay_target_means, overlay_target_cov, overlay_non_target_means, overlay_non_target_cov, overlay_non_target_mvn, overlay_target_mvn, processor_mode, target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
+            nonlocal waiting_start_new_classification, overlay_classifiers, overlay_target_means, overlay_target_cov, overlay_non_target_means, overlay_non_target_cov, overlay_non_target_mvn, overlay_target_mvn, processor_mode, target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
             
             # Check to see if pre-trained data is available to initialize a classifier
             try:
@@ -184,7 +184,9 @@ def Start():
                 start_signal = np.empty(N_STREAM_ELEMENTS);
                 start_signal[-1] = Processor_Code.START_OVERLAY_CLASSIFICATION;
                 processor_outlet.push_sample(start_signal);
-                            
+                          
+                waiting_start_new_classification = True;
+                
             # Else, there is no training data available; training is needed
             except FileNotFoundError:
                 
@@ -215,7 +217,7 @@ def Start():
         # TODO: Start_Keyboard() docstring
         def Start_Keyboard():
             
-            nonlocal keyboard_classifiers, keyboard_target_means, keyboard_target_cov, keyboard_non_target_means, keyboard_non_target_cov, keyboard_non_target_mvn, keyboard_target_mvn, processor_mode,target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
+            nonlocal waiting_start_new_classification, keyboard_classifiers, keyboard_target_means, keyboard_target_cov, keyboard_non_target_means, keyboard_non_target_cov, keyboard_non_target_mvn, keyboard_target_mvn, processor_mode, target_epochs, non_target_epochs, target_epochs_received, non_target_epochs_received;
             
             # Check to see if pre-trained data is available to initialize a classifier
             try:
@@ -254,6 +256,8 @@ def Start():
                 start_signal[-1] = Processor_Code.START_KEYBOARD_CLASSIFICATION;
                 processor_outlet.push_sample(start_signal);
                             
+                waiting_start_new_classification = True;
+                
             # Else, there is no training data available; training is needed
             except FileNotFoundError:
                 
@@ -313,7 +317,7 @@ def Start():
         def Handle_Incoming_Stimulus(stimulus_input):
                      
             nonlocal processor_running, stimuli_trial_data, stimuli_trial_index, total_trials_received, waiting_start_new_classification;
-            
+                                  
             # Grab the stimuli code
             stimuli_code = Stimuli_Code(stimulus_input[-1]);
             
@@ -363,25 +367,27 @@ def Start():
             # Check if the stream data is an overlay start request
             elif(stimuli_code == Stimuli_Code.REQUEST_OVERLAY_START):
 
-                #TODO: handle interface switching                 
-                pass;
-                
-            # Check if the stream data is an overlay start request
+                # Switch interface to overlay mode
+                if(processor_mode == Processor_Mode.CLASSIFICATION_OVERLAY or processor_mode == Processor_Mode.TRAINING_OVERLAY):
+                    #console.error("Overlay start requested while in overlay mode.");
+                    pass;
+                else:
+                    Start_Overlay();
+                    
+            # Check if the stream data is a keyboard start request
             elif(stimuli_code == Stimuli_Code.REQUEST_KEYBOARD_START):
-
-                #TODO: handle interface switching                 
-                pass;
+                
+                # Switch interface to keyboard mode
+                if(processor_mode == Processor_Mode.CLASSIFICATION_KEYBOARD or processor_mode == Processor_Mode.TRAINING_OVERLAY):
+                    #console.error("Keyboard start requested while in overlay mode.");
+                    pass;
+                else:
+                    Start_Keyboard();
                                 
             # Check if the stream data is a program shutdown announcement
             elif(stimuli_code == Stimuli_Code.BCI_SHUTDOWN):
                 #TODO: generate a different kind of interrupt here
                 raise Exception("BCI shutdown signal received.");
-                
-            # Check if the stream data is an interface shutdown announcement
-            elif(stimuli_code == Stimuli_Code.INTERFACE_SHUTDOWN):
-                #TODO: decide what to do when the interface shuts down
-                # (this will happen whenever switching between the keyboard & overlay)
-                pass;
                 
             # Check if the stimuli code is something unexpected
             else:
@@ -1139,9 +1145,13 @@ def Start():
                 # (offset by 1 then multiply by -1 as per scheme)           
                 res = np.zeros(N_STREAM_ELEMENTS); # processor code = 0 --> classification
                 res[most_probable_cell] = 1;
+                #switch kb to overlay
+                #res[37] = 1;
+                #switch overlay to kb
+                #res[43] = 1;
                 processor_outlet.push_sample(res);    
                 
-                console.debug(cell_probabilities);
+                #console.debug(cell_probabilities);
                 console.debug(most_probable_cell);
             
             # Else, a classification is not ready
@@ -1189,7 +1199,7 @@ def Start():
         ######################################
         
         #TODO: comment these        
-        N_TRAINING_TARGETS = 30;
+        N_TRAINING_TARGETS = 300;
         N_TRAINING_NON_TARGETS = ceil(N_TRAINING_TARGETS*((N_TILES/N_TILES_PER_FLASH)-1));
         CORRELATION_DEGREE = 4;        
         FILTER_SETTLING_TIME = 20;
@@ -1381,10 +1391,13 @@ def Start():
             # Check if stimulus input was received
             stimulus_input, _ = stimuli_inlet.pull_sample(0.0);
             if(stimulus_input is not None):
-                            
+                                            
+                # Grab the stimuli code
+                stimuli_code = Stimuli_Code(stimulus_input[-1]);
+                                
                 # Appropriately handle the stimulus input
                 Handle_Incoming_Stimulus(stimulus_input);
-                                            
+                      
             #########################
             #   Handle EEG stream   #
             #########################
@@ -1464,7 +1477,7 @@ def Start():
                                 np.save("overlay_non_targets.npy", non_target_epochs);
                                 
                                 # Initialize classifier
-                                Initialize_Overlay_Classifier();  
+                                Initialize_Overlay_Classifier();
                                 
                                 # Switch the processor to overlay classification mode
                                 processor_mode = Processor_Mode.CLASSIFICATION_OVERLAY;
@@ -1509,7 +1522,7 @@ def Start():
                 else:
                                 
                     # Validate that there is a classifier
-                
+                                
                     # Check if this epoch is the first trial of a new classification
                     if(stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.NON_SYNC_START or stimuli_trial_data[EEG_epoch_index,-1] == Stimuli_Code.SYNC_START):
                                 

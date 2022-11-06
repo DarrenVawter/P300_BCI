@@ -260,6 +260,14 @@ def Start():
             if(program_interaction == Program_Interaction.EXIT):
                 BCI_running = False;
                 continue;
+                
+            # Else, check if the interface requested to switch to overlay mode
+            elif(program_interaction == Program_Interaction.LAUNCH_OVERLAY): 
+                current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
+                
+            #Else, check if the interface requested to switch to keyboard mode
+            elif(program_interaction == Program_Interaction.LAUNCH_KEYBOARD):
+                current_BCI_mode = BCI_Mode.KEYBOARD_INTERFACE;
             
             ###############################
             #   Check for pygame events   #

@@ -33,21 +33,22 @@ N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
 
 # Number of BCI interactions in the overlay interface
 N_BCI_CONTROLS = 7;
-N_OVERLAY_CONTROLS = 1;
+N_OVERLAY_CONTROLS = 2;
 
 ##########################
 #   Keyboard constants   #
 ##########################
 
-# Number of keys on the keyboard interface
-N_KEYS = 45;
-
 # Number of keys flashed with each stimulus
 N_KEYS_PER_FLASH = 7;
 
 # Define the keyboard layout
+KEY_CHARACTERS = "1234567890QWERTYUIOPASDFGHJKLZXCVBNM_se";
+
+# Number of keys on the keyboard interface
+N_KEYS = len(KEY_CHARACTERS);
 KEY_LOCATIONS = np.zeros((N_KEYS,2));
-KEY_CHARACTERS = "1234567890QWERTYUIOPASDFGHJKLZXCVBNM_";
+
 key_offset = 170;
 
 # Row 0 --> ['1','2','3','4','5','6','7','8','9','0']
@@ -67,7 +68,7 @@ for i in range(10):
 # Row 2
 row_x_offset = 145;
 row_y = 730;
-for i in range(10):
+for i in range(9):
     KEY_LOCATIONS[i+20,0] = row_x_offset + key_offset*i;
     KEY_LOCATIONS[i+20,1] = row_y;
     

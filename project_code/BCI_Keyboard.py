@@ -17,7 +17,7 @@ import logging; # print pretty console logs
 # Internal Modules
 from BCI_Enumerations import Program_Interaction, PC_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
-from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, KEY_LOCATIONS, KEY_CHARACTERS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
+from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_KEYS, KEY_LOCATIONS, KEY_CHARACTERS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
 
 #############################################################
 #   Dislpay the virtual keyboard and run the P300 Speller   #
@@ -83,11 +83,13 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
         # Check if the number of tiles available to flash is <= the tiles per flash
         if(len(flash_bucket) <= N_TILES_PER_FLASH):
             
+            #TODO: handle when n_keys is not a perfect square
+            
             # Just flash the remaining available tiles 
             current_flash_group = flash_bucket;
             
             # Reset the bucket        
-            flash_bucket = np.arange(N_TILES);
+            flash_bucket = np.arange(N_KEYS);
                         
             # Exit the call early
             return;
@@ -139,10 +141,28 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
         
         # Check if classified key is a normal char
         if(classification_id < 36):
+            
             pyautogui.press(KEY_CHARACTERS[classification_id]);
+            
+        elif(classification_id == 36):
+            
+            pyautogui.press("space");
+            
+        elif(classification_id == 37):
+
+            # Classification is to switch to overlay --> key not 'handled'
+            return False;
+        
+        elif(classification_id == 38):
+
+            pyautogui.press("enter");
+        
         else:
             #TODO: handle others
             pass;
+        
+        # The key has been 'handled'
+        return True;
         
         # End of Handle_Key_Classification()
         pass;
@@ -206,9 +226,6 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     TILE_WIDTH = 100;
     TILE_HEIGHT = TILE_WIDTH;
     
-    # Number of tiles in the keyboard interface
-    N_TILES = 37;
-            
     # Load and scale flash images
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
     for i in range(N_FLASH_IMAGES):
@@ -238,7 +255,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     flash_timer = 0;
        
     # Most recent probability of each tile
-    tile_probabilities = np.ones((N_TILES,1))/N_TILES;
+    tile_probabilities = np.ones((N_KEYS,1))/N_KEYS;
         
     # Tiles that are currently being flashed
     current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
@@ -247,7 +264,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     #TODO: change dynamically with a timer
     
     # Tiles that have not yet been flashed as part of the current set    
-    flash_bucket = np.arange(N_TILES);
+    flash_bucket = np.arange(N_KEYS);
     
     # Initialize training target key ID
     target_tile = np.random.choice(flash_bucket);  
@@ -300,7 +317,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 console.debug("Starting keyboard interface in classification mode.");
                 
                 # Set flag to show that next trial is the start of a new classification
-                start_new_classification = False;
+                start_new_classification = True;
                 
                 # Remove the target key
                 target_tile = -1;
@@ -369,10 +386,10 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                     console.warning("Switching to keyboard classification mode.");
                 
                     # Reset tile probabilities
-                    tile_probabilities = np.ones((N_TILES,1))/N_TILES;
+                    tile_probabilities = np.ones((N_KEYS,1))/N_KEYS;
                     
                     # Reset the bucket        
-                    flash_bucket = np.arange(N_TILES);
+                    flash_bucket = np.arange(N_KEYS);
                 
                     # Remove the target tile
                     target_tile = -1;
@@ -392,7 +409,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             elif(processor_code == Processor_Code.PROBABILITY_UPDATE):
                         
                 # Update tile probabilities
-                tile_probabilities = processor_input[:N_TILES]; 
+                tile_probabilities = processor_input[:N_KEYS]; 
                             
             # Check if processor_code is a tile classification
             elif(processor_code == Processor_Code.CLASSIFICATION):
@@ -402,7 +419,11 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 console.info(classification_id);
                     
                 # Handle key classification
-                Handle_Key_Classification(classification_id);
+                if(not Handle_Key_Classification(classification_id)):
+                    
+                    # If the key was not handled --> it is requesting a switch to overlay mode
+                    return (Program_Interaction.LAUNCH_OVERLAY, None);
+                    
                 
                 # Flag to start a new classification
                 start_new_classification = True;
@@ -411,10 +432,10 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             elif(processor_code == Processor_Code.RESTART):
                                 
                 # Reset tile probabilities
-                tile_probabilities = np.ones((N_TILES,1))/N_TILES;
+                tile_probabilities = np.ones((N_KEYS,1))/N_KEYS;
                 
                 # Reset the bucket        
-                flash_bucket = np.arange(N_TILES);
+                flash_bucket = np.arange(N_KEYS);
             
                 # Flag to start a new classification
                 start_new_classification = True;
@@ -458,7 +479,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
                 
                 # Set unused cells to -1
-                stimuli_data[N_TILES:] = -1;
+                stimuli_data[N_KEYS:] = -1;
                 
                 # Set flashed cells to 1
                 stimuli_data[current_flash_group] = 1;
@@ -496,7 +517,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 stimuli_data = np.zeros(N_STREAM_ELEMENTS).astype(int);
                 
                 # Set unused cells to -1
-                stimuli_data[N_TILES:] = -1;
+                stimuli_data[N_KEYS:] = -1;
                 
                 # Set flashed cells to 1
                 stimuli_data[current_flash_group] = 1;
@@ -573,7 +594,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
         ################################
         
         # For each key
-        for key_index in range(len(KEY_CHARACTERS)):
+        for key_index in range(N_KEYS):
             
             # Draw gray background
             pygame.draw.rect(canvas, GRAY, [KEY_LOCATIONS[key_index, 0], KEY_LOCATIONS[key_index, 1], TILE_WIDTH, TILE_HEIGHT]);
@@ -637,7 +658,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             ##############################
             
             # Tiles that have not yet been flashed as part of the current set    
-            flash_bucket = np.arange(N_TILES);
+            flash_bucket = np.arange(N_KEYS);
             
             # Initialize training target key ID
             target_tile = np.random.choice(flash_bucket); 

@@ -61,9 +61,13 @@ class Program_Interaction(IntEnum):
 
     # Exit the program
     EXIT = 0;   
+    # Open the overlay interface
+    LAUNCH_OVERLAY = 1;   
     
     # Revert the overlay to the previous level of magnification
     REVERT_MAGNIFICATION = 10;
+    # Open the keyboard interface
+    LAUNCH_KEYBOARD = 11;   
     
     # Close keyboard interface
     CLOSE_KEYBOARD = 20;
