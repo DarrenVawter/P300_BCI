@@ -88,30 +88,30 @@ This BCI allows a user wearing an EEG to visually control a keyboard and mouse i
 
 *Notable Challenges:*
 
-*Using pre-existing solutions may be suboptimal
-  *Novel experimentation
-*Asynchronous hardware and software streams
-  *Programmatically controlling external hardware to synchronize EEG data stream with BCI GUI
-    *Developing Deterministic Random Bit Generator synchronization algorithm
-*Misleading data
-  *Running more trials with varying settings/hyperparameters to validate data
-*Need of a live participant to run EEG trials
-  *Simulate or stream pre-recorded data
+* Using pre-existing solutions may be suboptimal
+  * Novel experimentation
+* Asynchronous hardware and software streams
+  * Programmatically controlling external hardware to synchronize EEG data stream with BCI GUI
+    * Developing Deterministic Random Bit Generator synchronization algorithm
+* Misleading data
+  * Running more trials with varying settings/hyperparameters to validate data
+* Need of a live participant to run EEG trials
+  * Simulate or stream pre-recorded data
 
 *Limitations:*
 
-*Requires eye control over the span of 1 or 2 monitor(s)
-*User has to wear EEG headset 
-  *Current version uses wet EEG 
-  *Price: $1,700 setup
-*Inherent tradeoff between speed and accuracy
-*Tradeoff between fatigue and speed/accuracy
+* Requires eye control over the span of 1 or 2 monitor(s)
+* User has to wear EEG headset 
+  * Current version uses wet EEG 
+  * Price: $1,700 setup
+* Inherent tradeoff between speed and accuracy
+* Tradeoff between fatigue and speed/accuracy
 
 
 *Future improvements:*
 
-*Passive use detection
-*User-specific optimization of classifier hyperparameters
-*Real-time update of the P300 signal
-*Researching and designing optimal user interface
+* Passive use detection
+* User-specific optimization of classifier hyperparameters
+* Real-time update of the P300 signal
+* Researching and designing optimal user interface
 
