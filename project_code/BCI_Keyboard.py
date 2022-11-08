@@ -9,15 +9,17 @@ This module displays a virtual keyboard running a P300 speller to the user.
 import time;
 import numpy as np; # fast arrays&manipulation
 import pygame; # display to the screen and play sounds
+from gtts import gTTS; # Generating text-to-speech (TTS)
+from io import BytesIO; # Converting TTS to playable audio
+import _thread as threading; # Playing TTS without halting main program
 import pyautogui; # virtualize keyboard & mouse control
-from math import floor, ceil;
 import random;
 import logging; # print pretty console logs
 
 # Internal Modules
-from BCI_Enumerations import Program_Interaction, PC_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
+from BCI_Enumerations import Program_Interaction, Stimuli_Code, Processor_Code; # definitions for enumerated data types
 from Logging_Formatter import Logging_Formatter; # custom format for pretty console logs
-from BCI_Constants import BLACK, GRAY, WHITE, RED, SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_KEYS, KEY_LOCATIONS, KEY_CHARACTERS, N_TILES_PER_FLASH, N_BCI_CONTROLS, N_OVERLAY_CONTROLS; # pull constants from header
+from BCI_Constants import BLACK, GRAY, WHITE, FRAMERATE_CAP, FLASH_DURATION, N_STREAM_ELEMENTS, N_KEYS, KEY_LOCATIONS, KEY_CHARACTERS, N_KEYS_PER_FLASH; # pull constants from header
 
 #############################################################
 #   Dislpay the virtual keyboard and run the P300 Speller   #
@@ -38,6 +40,28 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     #   Define Helper Functions   #
     ###############################
     
+    #TODO: Generate_TTS() docstring
+    def Generate_TTS(text):
+
+        # Call a new thread for TTS generation in order to be non-blocking        
+        threading.start_new_thread( Generate_TTS_Thread, (text,) );
+
+        # End of Generate_TTS()
+        pass;
+
+    #TODO: Generate_TTS_Thread() docstring
+    def Generate_TTS_Thread(text):
+        
+        # Generate and play text to speech
+        speech = BytesIO()
+        tts = gTTS(text, lang='en')
+        tts.write_to_fp(speech)
+        pygame.mixer.music.load(speech, 'mp3')
+        pygame.mixer.music.play()
+        
+        # End of Generate_TTS_Thread()
+        pass;
+        
     """
     
     Choose_Flash_Tiles()
@@ -73,15 +97,15 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     """
     def Choose_Flash_Tiles():
         
-        #TODO: dynamically handle if N_TILES is not a multiple of N_TILES_PER_FLASH
+        #TODO: dynamically handle if N_TILES is not a multiple of N_KEYS_PER_FLASH
         
         nonlocal flash_bucket, current_flash_group;
         
-        for i in range(N_TILES_PER_FLASH):
+        for i in range(N_KEYS_PER_FLASH):
             current_flash_colors[i] = (random.randint(0,255),random.randint(0,255),random.randint(0,255));
         
         # Check if the number of tiles available to flash is <= the tiles per flash
-        if(len(flash_bucket) <= N_TILES_PER_FLASH):
+        if(len(flash_bucket) <= N_KEYS_PER_FLASH):
             
             #TODO: handle when n_keys is not a perfect square
             
@@ -117,7 +141,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
         flash_bucket = np.delete(flash_bucket,max_choice);
                 
         # Iterate until the flash group is populated
-        while(np.size(current_flash_group) < N_TILES_PER_FLASH):
+        while(np.size(current_flash_group) < N_KEYS_PER_FLASH):
             
             # Find the lowest probability amongst the tiles in the flash bucket
             min_probability = np.amin(tile_probabilities[flash_bucket]);
@@ -139,27 +163,25 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     #TODO: Handle_Key_Classification() docstring
     def Handle_Key_Classification(classification_id):
         
-        # Check if classified key is a normal char
-        if(classification_id < 36):
-            
-            pyautogui.press(KEY_CHARACTERS[classification_id]);
-            
-        elif(classification_id == 36):
-            
+        classification_char = KEY_CHARACTERS[classification_id];
+        
+        if(classification_char == 'b'):
+            Generate_TTS("Backspace.");
+            pyautogui.press("backspace");
+        elif(classification_char == 'e'):
+            Generate_TTS("Enter.");
+            pyautogui.press("enter");
+        elif(classification_char == '_'):
+            Generate_TTS("Spacebar.");
             pyautogui.press("space");
-            
-        elif(classification_id == 37):
-
+        elif(classification_char == 's'):
             # Classification is to switch to overlay --> key not 'handled'
             return False;
-        
-        elif(classification_id == 38):
-
-            pyautogui.press("enter");
-        
         else:
-            #TODO: handle others
-            pass;
+            Generate_TTS(classification_char);
+            pyautogui.press(classification_char);
+                        
+        time.sleep(1.5);
         
         # The key has been 'handled'
         return True;
@@ -191,7 +213,9 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
 
         nonlocal overlay_running;
 
+        Generate_TTS("Shutting down.");
         console.debug("Shutting down interface...");
+        time.sleep(1.5);
         
         # Announce that the overlay interface is shutting down
         console.info("Announcing shutdown.");
@@ -258,8 +282,8 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
     tile_probabilities = np.ones((N_KEYS,1))/N_KEYS;
         
     # Tiles that are currently being flashed
-    current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
-    current_flash_colors = np.zeros((N_TILES_PER_FLASH,3));
+    current_flash_group = np.zeros((N_KEYS_PER_FLASH,1));
+    current_flash_colors = np.zeros((N_KEYS_PER_FLASH,3));
     
     #TODO: change dynamically with a timer
     
@@ -303,6 +327,8 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             if(processor_input[-1] == Processor_Code.START_KEYBOARD_TRAINING):
                             
                 console.warning("Starting keyboard interface in training mode.");
+                Generate_TTS("Calibrating BCI keyboard.");
+                time.sleep(2.3);
                 
                 # Start the keyboard in training mode
                 training_mode = True;
@@ -315,6 +341,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             elif(processor_input[-1] == Processor_Code.START_KEYBOARD_CLASSIFICATION):
                                 
                 console.debug("Starting keyboard interface in classification mode.");
+                Generate_TTS("Keyboard mode.");
                 
                 # Set flag to show that next trial is the start of a new classification
                 start_new_classification = True;
@@ -377,6 +404,8 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             # Grab the processor code from the end of the array
             processor_code = Processor_Code(processor_input[-1]);
             
+            console.debug(processor_code);
+            
             # Check if input is end of training
             if(processor_code == Processor_Code.START_KEYBOARD_CLASSIFICATION):
 
@@ -384,6 +413,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 if(training_mode):
                     
                     console.warning("Switching to keyboard classification mode.");
+                    Generate_TTS("Keyboard mode.");
                 
                     # Reset tile probabilities
                     tile_probabilities = np.ones((N_KEYS,1))/N_KEYS;
@@ -448,6 +478,12 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 Shutdown_Overlay();
                 #TODO: differentiate this interaction
                 return (Program_Interaction.EXIT,None);
+            
+            # Check if the processor is sending a training-start signal
+            elif(processor_code == Processor_Code.START_KEYBOARD_TRAINING):
+                
+                #TODO: handle?
+                pass;
             
             # Else, input is updated probabilities
             else:
@@ -619,7 +655,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
                 # Draw target-key character
                 target_font = font.render(KEY_CHARACTERS[target_tile], True, WHITE);
                 target_w, _ = font.size(KEY_CHARACTERS[target_tile]);
-                canvas.blit(target_font, [960-target_w/2,10]);
+                canvas.blit(target_font, [960-target_w/2,110]);
           
                 #TODO: render "CALIBRATION MODE" at the top
                 
@@ -662,11 +698,23 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             
             # Initialize training target key ID
             target_tile = np.random.choice(flash_bucket); 
+            
+            target_char = KEY_CHARACTERS[target_tile];
+            if(target_char == 'b'):
+                Generate_TTS("Focus backspace.");
+            elif(target_char == 'e'):
+                Generate_TTS("Focus enter.");
+            elif(target_char == '_'):
+                Generate_TTS("Focus spacebar.");
+            elif(target_char == 's'):
+                Generate_TTS("Focus switch.");
+            else:
+                Generate_TTS("Focus "+target_char);
                              
             # Draw target-key character
             target_font = font.render(KEY_CHARACTERS[target_tile], True, WHITE);
             target_w, _ = font.size(KEY_CHARACTERS[target_tile]);
-            canvas.blit(target_font, [960-target_w/2,10]);
+            canvas.blit(target_font, [960-target_w/2,110]);
                             
             ###################################
             #   Finalize and draw the frame   #
@@ -679,7 +727,7 @@ def Run(UM232R, canvas, stimuli_outlet, processor_inlet):
             pygame.display.flip();
             
             # Pause for 1 second
-            time.sleep(1);
+            time.sleep(1.5);
             
             # Reset the target timer
             target_timer = time.time();

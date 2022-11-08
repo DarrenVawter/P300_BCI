@@ -1119,7 +1119,7 @@ def Start():
             
             # Weight previous probabilities
             #TODO: determine weighting coefficient
-            cell_probabilities[:] = old_probabilities[:] * 0.15 + cell_probabilities[:] * 0.85;
+            cell_probabilities[:] = old_probabilities[:] * 0.1 + cell_probabilities[:] * 0.9;
 
             most_probable_cell = np.argmax(cell_probabilities);         
             #console.warning(str(most_probable_cell)+": "+str(np.amax(cell_probabilities))+"\n"+str(cell_probabilities));
@@ -1376,6 +1376,7 @@ def Start():
         #TODO: initialize this in and pass this from BCI_Controller
         # Start a timer to ensure the filter initializes before collecting data
         filter_start_time = time.time();
+        filter_settled = False;
                     
         ###########################
         #   Main Processor Loop   #
@@ -1384,6 +1385,13 @@ def Start():
         processor_running = True;
         while(processor_running):
                     
+            # Check filter status
+            if(not filter_settled and time.time()-filter_start_time > FILTER_SETTLING_TIME):
+                
+                filter_settled = True;
+                console.debug("Filter settled.");
+                
+            
             #############################
             #   Handle stimuli stream   #
             #############################
@@ -1438,7 +1446,7 @@ def Start():
                             console.warning("Received training data when not expected.");              
                                                 
                     # Validate that the filter is settled
-                    elif(time.time()-filter_start_time > FILTER_SETTLING_TIME):
+                    elif(filter_settled):
                     
                         # Normalize the epoch by channel
                         normalized_epoch = EEG_epoch_data[EEG_epoch_index,:,:]/np.linalg.norm(EEG_epoch_data[EEG_epoch_index,:,:], axis=0);
@@ -1541,11 +1549,11 @@ def Start():
                         # Calculate trial probability
                         trial_probability = Calculate_Trial_Probability(correlation_coefficients);
                         
-                        # Update cell probabilities
-                        #TODO: un-ghetto-ify this
-                        if(time.time()-filter_start_time > FILTER_SETTLING_TIME):
-                           Update_Probabilities(trial_probability);
-                           pass;
+                        # Validate that the filter has settled
+                        if(filter_settled):
+                        
+                            # Update cell probabilities
+                            Update_Probabilities(trial_probability);
                         
                         #TODO: calculate the probability that the user was looking at the screen at all
                         

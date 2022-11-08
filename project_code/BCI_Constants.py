@@ -22,11 +22,11 @@ GREEN = (0, 0, 255);
 #########################
 
 # Number of tiles flashed with each stimulus
-N_TILES_PER_FLASH = 7;
+N_TILES_PER_FLASH = 10;
 
 # Number of rows/cols to divide the overlay into
-N_TILE_ROWS = 7;
-N_TILE_COLUMNS = 7;
+N_TILE_ROWS = 10;
+N_TILE_COLUMNS = 10;
 
 # Total number of tiles on the overlay interface
 N_TILES = N_TILE_ROWS*N_TILE_COLUMNS;
@@ -43,7 +43,11 @@ N_OVERLAY_CONTROLS = 2;
 N_KEYS_PER_FLASH = 7;
 
 # Define the keyboard layout
-KEY_CHARACTERS = "1234567890QWERTYUIOPASDFGHJKLZXCVBNM_se";
+KEY_CHARACTERS = "1234567890bQWERTYUIOPASDFGHJKLeZXCVBNM_s";
+n_row_0 = 11;
+n_row_1 = 10;
+n_row_2 = 10;
+n_row_3 = 9;
 
 # Number of keys on the keyboard interface
 N_KEYS = len(KEY_CHARACTERS);
@@ -54,30 +58,30 @@ key_offset = 170;
 # Row 0 --> ['1','2','3','4','5','6','7','8','9','0']
 row_x_offset = 100;
 row_y = 390;
-for i in range(10):
+for i in range(n_row_0):
     KEY_LOCATIONS[i,0] = row_x_offset + key_offset*i;
     KEY_LOCATIONS[i,1] = row_y;
     
 # Row 1
 row_x_offset = 100;
 row_y = 560;
-for i in range(10):
-    KEY_LOCATIONS[i+10,0] = row_x_offset + key_offset*i;
-    KEY_LOCATIONS[i+10,1] = row_y;
+for i in range(n_row_1):
+    KEY_LOCATIONS[i+n_row_0,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+n_row_0,1] = row_y;
     
 # Row 2
 row_x_offset = 145;
 row_y = 730;
-for i in range(9):
-    KEY_LOCATIONS[i+20,0] = row_x_offset + key_offset*i;
-    KEY_LOCATIONS[i+20,1] = row_y;
+for i in range(+n_row_2):
+    KEY_LOCATIONS[i+n_row_0+n_row_1,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+n_row_0+n_row_1,1] = row_y;
     
 # Row 3
 row_x_offset = 220;
 row_y = 910;
-for i in range(10):
-    KEY_LOCATIONS[i+29,0] = row_x_offset + key_offset*i;
-    KEY_LOCATIONS[i+29,1] = row_y;
+for i in range(+n_row_3):
+    KEY_LOCATIONS[i+n_row_0+n_row_1+n_row_2,0] = row_x_offset + key_offset*i;
+    KEY_LOCATIONS[i+n_row_0+n_row_1+n_row_2,1] = row_y;
 
 ###################################
 #   BCI-wide physical constants   #
@@ -98,13 +102,13 @@ SAMPLING_FREQUENCY = 250;
 ##################################
 
 # Default cell classification threshold
-DEFAULT_THRESHOLD = 0.95;
+DEFAULT_THRESHOLD = 0.9;
     
 # Caclulate the number of outlets in the processor and stimuli streams
 N_STREAM_ELEMENTS = max(N_TILES,N_KEYS) + 1;
 
 # Amount of time, in seconds, to present each stimulus for
-FLASH_DURATION = 0.1;
+FLASH_DURATION = 0.12;
 
 # Stimulus presentation frequency, in Hz
 FLASH_FREQUENCY = 1/FLASH_DURATION;

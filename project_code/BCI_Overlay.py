@@ -9,9 +9,13 @@ This module displays a screen overlay running a P300 speller to the user.
 import time;
 import numpy as np; # fast arrays&manipulation
 import pygame; # display to the screen and play sounds
+from gtts import gTTS; # Generating text-to-speech (TTS)
+from io import BytesIO; # Converting TTS to playable audio
+import _thread as threading; # Playing TTS without halting main program
 import d3dshot; # grab screen pixels
 import pyautogui; # virtualize keyboard & mouse control
 from math import floor, ceil;
+import random;
 import logging; # print pretty console logs
 
 # Internal Modules
@@ -38,6 +42,28 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     #   Define Helper Functions   #
     ###############################
     
+    #TODO: Generate_TTS() docstring
+    def Generate_TTS(text):
+
+        # Call a new thread for TTS generation in order to be non-blocking        
+        threading.start_new_thread( Generate_TTS_Thread, (text,) );
+
+        # End of Generate_TTS()
+        pass;
+
+    #TODO: Generate_TTS_Thread() docstring
+    def Generate_TTS_Thread(text):
+        
+        # Generate and play text to speech
+        speech = BytesIO()
+        tts = gTTS(text, lang='en')
+        tts.write_to_fp(speech)
+        pygame.mixer.music.load(speech, 'mp3')
+        pygame.mixer.music.play()
+        
+        # End of Generate_TTS_Thread()
+        pass;
+        
     """
     
     Choose_Flash_Tiles()
@@ -76,6 +102,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         #TODO: dynamically handle if N_TILES is not a multiple of N_TILES_PER_FLASH
         
         nonlocal flash_bucket, current_flash_group, exclude_bucket;
+        
+        for i in range (N_TILES_PER_FLASH):
+            current_flash_colors[i] = (random.randint(0,255),random.randint(0,255),random.randint(0,255));
         
         # Check if the number of tiles available to flash is <= the tiles per flash
         if(len(flash_bucket) <= N_TILES_PER_FLASH):
@@ -272,7 +301,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
 
         nonlocal screen_grabber, overlay_running;
 
+        Generate_TTS("Shutting down.");
         console.debug("Shutting down interface...");
+        time.sleep(1.5);
         
         # Announce that the overlay interface is shutting down
         console.info("Announcing shutdown.");
@@ -367,6 +398,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         
     # Tiles that are currently being flashed
     current_flash_group = np.zeros((N_TILES_PER_FLASH,1));
+    current_flash_colors = np.zeros((N_TILES_PER_FLASH,3));
     
     #TODO: change dynamically with a timer
     
@@ -416,6 +448,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             if(processor_input[-1] == Processor_Code.START_OVERLAY_TRAINING):
                             
                 console.debug("Starting overlay in training mode.");
+                Generate_TTS_Thread("Calibrating BCI overlay. Focus on the highlighted tile.");
+                time.sleep(3);
                 
                 # Start the overlay in training mode
                 training_mode = True;
@@ -428,6 +462,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             elif(processor_input[-1] == Processor_Code.START_OVERLAY_CLASSIFICATION):
                                 
                 console.debug("Starting overlay in classification mode.");
+                Generate_TTS("Overlay mode.")
                 
                 # Set flag to show that next trial is the start of a new classification
                 start_new_classification = True;
@@ -497,6 +532,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 if(training_mode):
                     
                     console.warning("Switching overlay to classification mode.");
+                    Generate_TTS("Overlay mode.");
                 
                     # Reset tile probabilities
                     tile_probabilities = np.ones((N_TILES,1))/N_TILES;
@@ -519,9 +555,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     raise RuntimeError("Start classification signal received while in classification mode.");
                 
             # Check if input is a probability update
-            elif(processor_code == Processor_Code.PROBABILITY_UPDATE):
-                        
-                # Update tile probabilities
+            elif(processor_code == Processor_Code.PROBABILITY_UPDATE):                # Update tile probabilities
                 tile_probabilities = processor_input[:N_TILES]; 
                             
             # Check if processor_code is a tile classification
@@ -534,72 +568,90 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Check if classified tile is an overlay control option
                 if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
-                    # Convert control to overlay interaction
-                    program_interaction = Program_Interaction(classification_id%N_TILE_COLUMNS+10);
-                    
-                    # Check if the user zoomed out
-                    if(program_interaction == Program_Interaction.REVERT_MAGNIFICATION):
-                                            
-                        # Revert magnification to full screen
-                        #TODO: store the last zoom level and revert to that instead    
-                        magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];                       
+                    if(classification_id%N_TILE_COLUMNS > N_OVERLAY_CONTROLS-1):
+                        continue;  
+                             
+                    else:                
+                        # Convert control to overlay interaction
+                        program_interaction = Program_Interaction(classification_id%N_TILE_COLUMNS+10);
                         
-                    # Check if the user switched to keyboard mode
-                    if(program_interaction == Program_Interaction.LAUNCH_KEYBOARD):
-                        
-                        return (program_interaction, None);
+                        # Check if the user zoomed out
+                        if(program_interaction == Program_Interaction.REVERT_MAGNIFICATION):
+                                                
+                            Generate_TTS("Reverting magnification.");
+                            # Revert magnification to full screen
+                            #TODO: store the last zoom level and revert to that instead    
+                            magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];                       
+                            
+                        # Check if the user switched to keyboard mode
+                        if(program_interaction == Program_Interaction.LAUNCH_KEYBOARD):
+                            
+                            return (program_interaction, None);
                         
                 # Check if classified tile is a BCI control option
                 elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
 
-                    # Convert control to BCI interaction
-                    PC_interaction = PC_Interaction(floor(classification_id/N_TILE_COLUMNS));
-                    
-                    # Check if the user left clicked
-                    if(PC_interaction == PC_Interaction.CLICK):
+                    if(floor(classification_id/N_TILE_COLUMNS) > N_BCI_CONTROLS-1):
+                        continue;   
                         
-                        # Handle the left click
-                        Handle_Click("left");
-                                                
-                    # Check if the user double clicked
-                    elif(PC_interaction == PC_Interaction.DOUBLE_CLICK):  
+                    else:
+                        # Convert control to BCI interaction
+                        PC_interaction = PC_Interaction(floor(classification_id/N_TILE_COLUMNS));
                         
-                        # Handle the double click
-                        Handle_Click("double");
-                        
-                    # Check if the user right clicked
-                    elif(PC_interaction == PC_Interaction.RIGHT_CLICK):    
-                        
-                        # Handle the right click
-                        Handle_Click("right");  
-                        
-                    # Check if the user pressed page up
-                    elif(PC_interaction == PC_Interaction.PAGE_UP):  
-                        
-                        # Press the page up key
-                        pyautogui.press("pageup");  
-                        
-                    # Check if the user pressed page down
-                    elif(PC_interaction == PC_Interaction.PAGE_DOWN): 
-                        
-                        # Press the page down key
-                        pyautogui.press("pagedown");  
-                        
-                    # Check if the user tabbed
-                    elif(PC_interaction == PC_Interaction.TAB):  
-                        
-                        # Press the tab key
-                        pyautogui.press("tab");  
-                        
-                    # Check if the user pressed enter
-                    elif(PC_interaction == PC_Interaction.ENTER):   
-                        
-                        # Press the enter key 
-                        pyautogui.press("enter");                                     
+                        # Check if the user left clicked
+                        if(PC_interaction == PC_Interaction.CLICK):
+
+                            Generate_TTS("Left click.");
+
+                            # Handle the left click
+                            Handle_Click("left");
+                                                    
+                        # Check if the user double clicked
+                        elif(PC_interaction == PC_Interaction.DOUBLE_CLICK):  
+                            
+                            Generate_TTS("Double click.");
+                            # Handle the double click
+                            Handle_Click("double");
+                            
+                        # Check if the user right clicked
+                        elif(PC_interaction == PC_Interaction.RIGHT_CLICK):    
+                            
+                            Generate_TTS("Right click.");
+                            # Handle the right click
+                            Handle_Click("right");  
+                            
+                        # Check if the user pressed page up
+                        elif(PC_interaction == PC_Interaction.PAGE_UP):  
+                            
+                            Generate_TTS("Page up.");
+                            # Press the page up key
+                            pyautogui.press("pageup");  
+                            
+                        # Check if the user pressed page down
+                        elif(PC_interaction == PC_Interaction.PAGE_DOWN): 
+                            
+                            Generate_TTS("Page down.");
+                            # Press the page down key
+                            pyautogui.press("pagedown");  
+                            
+                        # Check if the user tabbed
+                        elif(PC_interaction == PC_Interaction.TAB):  
+                            
+                            Generate_TTS("Tab.");
+                            # Press the tab key
+                            pyautogui.press("tab");  
+                            
+                        # Check if the user pressed enter
+                        elif(PC_interaction == PC_Interaction.ENTER):   
+                            
+                            Generate_TTS("Enter.");
+                            # Press the enter key 
+                            pyautogui.press("enter");                                     
                     
                 # Else, classified tile is a magnification tile
                 else:
 
+                    Generate_TTS("Zooming.");
                     # Update the magnification rect
                     magnification_rect = Get_Tile_Rect(int(classification_id));
                     
@@ -847,8 +899,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 # Get the tile's column
                 col = current_flash_group[i] % N_TILE_COLUMNS;
                 
-                # Render the flash images border
-                pygame.draw.rect(canvas, WHITE, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                # Render the flash image's random color border
+                pygame.draw.rect(canvas, current_flash_colors[i], [col*TILE_WIDTH+TILE_WIDTH/12, row*TILE_HEIGHT+TILE_HEIGHT/12, TILE_WIDTH*5/6, TILE_HEIGHT*5/6]);
                 
                 # Render the corresponding flash image
                 canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH+TILE_WIDTH/8, row*TILE_HEIGHT+TILE_HEIGHT/8, TILE_WIDTH*3/4, TILE_HEIGHT*3/4]);      
@@ -858,10 +910,10 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             ###################################
             
             # Render tile boundaries
-            for i in range(N_TILE_COLUMNS):
-                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
-            for i in range(N_TILE_ROWS):
-                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
+            for i in range(N_TILE_COLUMNS+1):
+                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=6);
+            for i in range(N_TILE_ROWS+1):
+                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=6);
             
             # Cap fps
             clock.tick(FRAMERATE_CAP);
@@ -900,9 +952,9 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             
             # Render tile boundaries
             for i in range(N_TILE_COLUMNS):
-                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=3);
+                pygame.draw.line(canvas, GRAY, (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),0), (round(SCREEN_WIDTH*i/N_TILE_COLUMNS),SCREEN_HEIGHT), width=6);
             for i in range(N_TILE_ROWS):
-                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=3);
+                pygame.draw.line(canvas, GRAY, (0,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), (SCREEN_WIDTH,round(SCREEN_HEIGHT*i/N_TILE_ROWS)), width=6);
             
             # Cap fps
             clock.tick(FRAMERATE_CAP);
@@ -911,7 +963,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             pygame.display.flip();
             
             # Pause for 0.5 seconds
-            time.sleep(0.5);
+            time.sleep(1);
             
             # Reset the target timer
             target_timer = time.time();

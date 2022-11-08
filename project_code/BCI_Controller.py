@@ -171,8 +171,8 @@ def Start():
         #######################################
         
         # Initialize the current BCI mode to the default overlay
-        #current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
-        current_BCI_mode = BCI_Mode.KEYBOARD_INTERFACE;
+        current_BCI_mode = BCI_Mode.OVERLAY_INTERFACE;
+        #current_BCI_mode = BCI_Mode.KEYBOARD_INTERFACE;
         
         # Initialize the overlay rect
         magnification_rect = [0, 0, SCREEN_WIDTH, SCREEN_HEIGHT];
