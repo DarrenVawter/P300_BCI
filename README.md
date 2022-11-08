@@ -1,5 +1,14 @@
 # CruX @ UCLA P300 BCI 
 
+## Presentation and Demonstrations
+
+* NeuroTechX Student Club Competition Presentation (including short demos of keyboard and overlay interfaces)
+  * https://drive.google.com/file/d/1K0_7yf0yF9sV8O8vak3vLr-YgmjuWkfi/view?usp=share_link
+* Keyboard interface demonstration (w/ intro)
+  * https://drive.google.com/file/d/1oyYfFMhPj219BxCBmprONrwqLPeU8vo1/view?usp=share_link
+* Overlay interface demonstration (no intro)
+  * https://drive.google.com/file/d/1g3a3haj1WufKYOtaX_5pQ6jYdXAm_rGc/view?usp=share_link
+  
 ## Technical Description
 
 This BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
