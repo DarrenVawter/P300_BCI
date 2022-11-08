@@ -17,7 +17,9 @@ This BCI allows a user wearing an EEG to visually control a keyboard and mouse i
 
 ### Data pipeline
 
-[Has to include the pipeline picture and maybe description of it]
+[Has to include the *current* pipeline picture and maybe description of it]
+
+![Data pipeline](/Images/P300_Data_Flow_V3_Outdated.png)
 
 ### User experience
 
