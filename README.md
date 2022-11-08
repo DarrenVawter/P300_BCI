@@ -77,11 +77,9 @@ This BCI allows a user wearing an EEG to visually control a keyboard and mouse i
     https://raw.githubusercontent.com/openbci-archive/Docs/master/assets/images/electrode%20cap%20nodes_1.png
    * Using applicator syringe, apply gel to REF, GND, O1, O2, P3, P4, PZ, C3, C4, and CZ.
      * If unfamiliar with gel application, download OpenBCI GUI and stream data. Change vertical scale to automatic and apply gel slowly until each channel's scale is minimized.
- * Launch program (TODO: package this with a launch script)
-   * First, launch Cyton_Data_Packager.py in its own kernel.
-   * Second, launch BCI_Controller.py in its own kernel.
-     * (currently, the mouse must be hovering over monitor 1 when this module is launched to function correctly)
-   * Last, launch P300_Processor.py in its own kernel.
+ * Run Launch_BCI.py
+   * (Currently, when launching, the mouse must be hovering over monitor 2 to open the overlay on the correct screen.)
+   * TODO: Attach Launch_BCI.py to a startup script so the program launches as soon as the PC boots
  * The program will start in overlay mode.
  * If the program is launched without pre-trained data, it will automatically enter "overlay calibration" mode. 
    * Calibration mode takes ~5-6 minutes. 
