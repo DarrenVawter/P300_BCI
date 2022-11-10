@@ -16,14 +16,14 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 ### Data Pipeline
 
 TODO: update data pipeline image to V4
-![Data pipeline](/Images/P300_Data_Flow_V3_Outdated.png)
+![Data pipeline](/Images/P300_BCI_Data_Pipeline.png)
 
 ### Methods
 
 #### P300
 
 The P300 (or P3) response is an event related electrical potential measurable on the scalp, primarily detectable near the occipital, parietal, and central regions. The 'event' which triggers a P300 can be any unexpected or 'oddball' stimulus. The 'P' in P300 refers to the fact that inflection in potential is positive. The '300' in P300 refers to the fact that the P300 response is usually detectable ~300ms after onset of the oddball stimulus. What constititutes an oddball stimulus to the brain is non-trivial to parameterize. Examples include listening to a constant tone which is interrupted with sporadic beeps, staring at a red street light when it suddenly turns green, or looking at a static image which is sporadically 'flashed.' In this context, 'flashed' can mean having the brightness of the static image increase or having a different color or image abruptly appear over the original static image for a short period of time (10ms-30ms). For the remainder of this document, 'flash' will refer to abruptly and briefly covering up the static image with a different image.
-![P300 Response Example](/Images/P300_Response_Sample.png.png) ![Target vs Non-target Response Example](/Images/Target_vs_Non_Target.png)
+![P300 Response Example](/Images/P300_Response_Sample.png) ![Target vs Non-target Response Example](/Images/Target_vs_Non_Target.png)
 
 
 #### Paradigm
