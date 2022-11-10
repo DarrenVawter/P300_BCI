@@ -28,7 +28,7 @@ In order to leverage the P300 response, a paradigm must be designed that can dif
 
 ![Farwell and Donchin Paradigm](/Images/Farwell_and_Donchin_Paradigm.png)
 
-Two drawbacks that the team identified with this format were:
+Through literature review and evaluation, three drawbacks that the team identified with this format were:
 * Most individuals are not accustomed to typing on a keyboard in alpha-numeric order, which increases character aquisition time.
 	* Although users typically improve rapidly if using this format, the team hypothesized that it would be unlikely for individuals accustomed to a lifetime of QWERTY format keyboards to match their QWERTY character aquisition time.
 	* For users unaccustomed to QWERTY, either format would require training to improve character aquisition time regardless.
@@ -37,6 +37,28 @@ Two drawbacks that the team identified with this format were:
 	* As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependendant and non-trivial.
 	* To circumvent this problem, the characters can instead be grouped randomly or based upon their current probabilities of being the desired character.
 		* Context can still be used alongside this method in order to dynamically adjust character classification thresholds (i.e. make more likely characters 'easier' to click and less likely characters 'harder' to click).
+* Simply intensifying the brightness of the character is not the most optimal ellicitation of a characterizable response signal.
+	* It has been shown that the facial detection response interferes constructively with the P300 response.
+		* Thus, the response can be made more detectable and its SNR can be increased by instead flashing images of faces over the characters.
+		* A 'face' can be an actual image of a human face, a drawn caricature of a face, or even 2 dots and a line oriented to look face-like.
+	* The N100 and N200 responses are both responses to any abrupt changes in visual or auditory input.
+		* (e.g. If an individual focused on a metronome, then, with each beat, there would be an abrupt auditory change, eliciting some N100 and N200 response. There would not be an oddball change, as the individual would be expecting the beat, thus, we would not expect a significant P300 response unless, for example, the beat sporadically changed pitch for a moment).
+		* The N100 and N200 responses have been shown to be, to some extent, proportional to the perceived intensity of the abrupt change.
+			* Thus, it is beneficial to attempt to maximize the change in stimulus between the static image and flash (e.g. if the static character is dark/dull/gray, the abrupt image covering it should be bright/vivid/colorful).
+			
+A variety of P300 paradigms exist in practice and in the literature, some of which are hybridized (auditory + visual P300, P300 + SSVEP, P300 + other signal), and an optimal paradigm is still an active area of research. Following are just a few example paradigms:
+
+* Visual P300 w/ randomized character groups and flashing smiley faces of varying color
+
+![Smiley Paradigm](/Images/P300_Smiley_Paradigm.png)
+
+* Audiovisual P300 w/ group zooming (group classification followed by individualcharacter classification)
+
+![Audiovisual Paradigm](/Images/Audiovisual_P300_Paradigm.png)
+
+* Negative intensity visual P300 response (expected response is a change, oddball response is a sudden lack of change)
+
+![Inverted Oddball Paradigm](/Images/P300_Inverted_Oddball_Paradigm.png)
 
 #### Classification
 
