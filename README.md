@@ -62,7 +62,9 @@ A variety of P300 paradigms exist in practice and in the literature, some of whi
 
 Per the above information and through literature review, the team designed the following two paradigms
 
-* Paradigm for the keyboard interface
+![Keyboard Interface Sample](/Images/Keyboard_Interface.jpg)
+
+* Paradigm for the keyboard interface (See video in Presentation and Demonstrations.)
 	* Keyboard layout: QWERTY (plus some special characters and a row for word suggestions)
 		* Pro(s)
 			* Faster character aquisition time than alpha-numeric.
@@ -115,7 +117,10 @@ Per the above information and through literature review, the team designed the f
 				* The current UI was generated after two days of testing and based primarily on user feedback.
 				* Each UI variable must be individually varied, and the results analyzed, in order to determine the optimal UI.
 				* (A theoretically optimal flash frequency can be determined analytically based upon the signature P300 response, but that would necessarily assume that the signature was independent of the flash frequency, which the team did not observe to be true.)
-* Paradigm for the overlay (mouse/monitor) interface
+
+![Overlay Interface Sample](/Images/Overlay_Interface.jpg)
+
+* Paradigm for the overlay (mouse/monitor) interface (See video in Presentation and Demonstrations.)
 	* The team found no general-purpose mouse use interface. This lack of pre-existing literature means many of the design decisions for this interface are unjustified or based primarily on intuition/hypothesis.
 		* The pre-existing paradigms the team found for mouse click interfaces were:
 			* Application specific/highly tokenized
@@ -130,10 +135,31 @@ Per the above information and through literature review, the team designed the f
 				* This method has the *ability* to be generalized by instead moving the mouse some amount, instead of snapping to a token. The team hypothesized that this method would be unacceptably slow.
 	* The paradigm is fundamentally the same as the keyboard interface, with the following changes:
 		* Layout:
-			* monitor A is mirrored onto a portion (the majority) of monitor B
-			* extra options (left/right click, tab, enter, open keyboard, zoom out) are available on the edges of the screen
-			* the mirror on monitor B is overlaid with a grid to cut the screen up into cells
-			* the cells 
+			* Monitor A is live-mirrored onto a portion (the majority) of monitor B, the mouse always remains in the center of the mirror.
+			* Extra options (left/right click, tab, enter, open keyboard, zoom out, etc.) are available on the edges of the screen.
+			* The mirror on monitor B is overlaid with a grid to cut the screen up into cells.
+			* The cells are then flashed using the same flash images/flash borders/grouping methods as described in the keyboard interface paradigm.
+			* If a side-bar option (click, open keyboard, etc.) is selected, then the corresponding action is triggered as expected. If a tile from the mirror section is selected, the mirror zooms into that portion of the screen in order to effectively move the mouse.
+			* Pro(s)
+				* With a grid of 10x10 (the only currently tested schem) almost any position on the screen can be clicked within 2-4 interactions (1-3 zooms, 1 click).
+			* Con(s)
+				* Live-mirroring the screen elicits unintentional P300 responses (i.e. the screen may have movement on it).
+					* This may be alleviated by presenting a static mirror and only updating it every N seconds, to minimize/remove unwanted P300 signals.
+						* This may have unintended consequences.
+						* This would necessitate that the user could look over both screens for a live view (i.e. harder to use for people with limited visual range).
+				* By overlaying a thin grid, there is next-to-zero space between cells, meaning neighboring cells are highly probable to elicit undesired P300.
+					* This *may* be alleviated/lessened with UI improvements (cell shading, thicker borders, border contrast coloring, etc.)
+				* This layout is not conducive to click-and-drag.
+	* Future
+		* While the BCI excels in generality, it can be highly optimized in common application-specific instances.
+			* Tokenize where possible.
+				* (e.g. when playing chess, only flash the moveable pieces, then where they can move to, and a couple of special sidebar options.)
+			* Special sidebar options.
+				* (e.g. when Google Chrome is the focused window, have sidebar options for refresh, new tab, back, etc.)
+		* Optimize the UI (same comments as keyboard interface).
+		* Highlight the currently most probable cell (same comments as keyboard interface).
+		
+		
 #### Classification
 
 ### Data Collection
