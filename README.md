@@ -189,10 +189,18 @@ Above is a visualization of how the classifier signals are generated.
 
 ### Data Collection
 
-* Trigger Synchronization
-	* ![External Triggering Circuit](/Images/Triggering_Circuit.png)	
-	* The above circuit serves to send signals with the software (utilizing the FTDI chip) to tag the incoming hardware samples with synchronization tags. 
-	* Using DRBGs (with twister algo) to tag hardware and software trials separately. If tags mis-match at some point: sync is lost. Maximum back-correlation of hardware/software tags will identify the minimum number of trials to drop in order to guarantee that no bad packets are used.
+The OpenBCI headset, Cyton board, and Cyton dongle handle the majority of the data collection. The only caveats are the following:
+* The incoming hardware samples are timestamped when *received*. This is a problem for our time-sensitive task, as the bluetooth dongle may experience momentary disconnects, buffering timing inconsistencies, and clock drift. If the timestamped data is used, the inter-trial-interference is sufficiently high such that no P300 response is detectable whatsoever when averaging across trials.
+	* The fix to this is to use an external triggering circuit with an FTDI chip. Whenever the GUI renders a new flash to the screen, it sends a signal to the FTDI, which sends a signal to the Cyton, which is then packaged together with the corresponding sample at that instant. The timestamps can then be ignored, as it is known which samples correspond to the starts of flashes.
+* Dropped samples are recorded by the OpenBCI dongle and can be adjusted for. They tend to be so short-lived that this was not implemented and no noticeable issues arose. Best practice would be to adjust the data for these small amounts of dropped samples. Sometimes, a dropped sample is the sample that corresponds to the start of a new flash. When this happens a de-sync event is triggered between the hardware and software.
+* The OpenBCI GUI has a *known issue* when collecting GPIO or analog pin data while sampling with 8-channels. Instead of sampling at 250Hz, the pins are sampled at ~45Hz. The only current solution to this is to write custom software, hence the necessary existence of Cyton_Data_Packager.py, which primarily functions to collect data streamed from the Cyton board.
+* If the EEG headcap is adjusted too many times, or worn for several hours, the gel may need to re-applied or even cleaned out and then re-applied.
+	* Sufficient gel must also be used to ensure sufficient conductivity between the electrode and scalp.
+	* Individuals with particularly thick hair may struggle to achieve quality signals, as is typical with EEG.
+
+![External Triggering Circuit](/Images/Triggering_Circuit.png)	
+
+The above circuit serves to send signals with the software (utilizing the FTDI chip) to tag the incoming hardware samples with synchronization tags. Using DRBGs (seeded twister) to tag hardware and software trials separately. If tags mis-match at some point: a de-synchronizing event occured. Maximum back-correlation of hardware/software tags will identify the minimum number of trials to drop in order to guarantee that no bad packets are used and to resynchronize properly.
   
 ### Data Processing
 
