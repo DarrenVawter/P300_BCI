@@ -6,7 +6,7 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 
 * NeuroTechX Student Club Competition Presentation (including short demos of keyboard and overlay interfaces)
   * https://drive.google.com/file/d/1K0_7yf0yF9sV8O8vak3vLr-YgmjuWkfi/view?usp=share_link
-* Keyboard interface demonstration (w/ intro)
+* Keyboard interface demonstration using NLP and word suggestions (w/ intro)
   * https://drive.google.com/file/d/1oyYfFMhPj219BxCBmprONrwqLPeU8vo1/view?usp=share_link
 * Overlay interface demonstration (no intro)
   * https://drive.google.com/file/d/1g3a3haj1WufKYOtaX_5pQ6jYdXAm_rGc/view?usp=share_link
@@ -59,6 +59,31 @@ A variety of P300 paradigms exist in practice and in the literature, some of whi
 * Negative intensity visual P300 response (expected response is a change, oddball response is a sudden lack of change)
 
 ![Inverted Oddball Paradigm](/Images/P300_Inverted_Oddball_Paradigm.png)
+
+Per the above information and through literature review, the team designed the following two paradigms
+
+* Paradigm for the keyboard interface
+	* Keyboard layout: QWERTY (plus some special characters and a row for word suggestions)
+		* Pro(s)
+			* Faster character aquisition time.
+			* Easier to use for most users / less learning curve.
+		* Con(s)
+			* Rectangular: may force a sub-optimal distance between characters in order to fit to a more square screen
+	* Flash image: League of Legends character faces
+		* Pro(s)
+			* Varying between one of several faces: more 'unexpected' oddball should elicit a stronger P300 response
+			* Character faces are generally bright and colorful: perception of a more abrupt flash should elicit stronger N100 and N200 responses
+				* Resulting note: The team did find a substantial N200 response, but the N100 response was generally non-characterizable.
+			* The member(s) of the team using the BCI were all familiar with the characters and instinctively recognized the images as faces.
+		* Con(s)
+			* Unclear if a user unfamiliar with the characters would recognize the images as 'faces.'
+			* Probably best not to use copyrighted images in a full-release version.
+	* Flash image border: randomized color 
+		* Pro(s)
+			* Flashing a randomized color with the image should make the oddball more 'unexpected'
+		* Con(s)
+			* A random color means the border can blend with the character image or blend between the character and black background, lessening the perceived intensity of the abrupt change.
+				* This can be alleviated by using a pseudo-random image border (unimplemented/future)
 
 #### Classification
 
