@@ -27,10 +27,7 @@ The fifth figure validates that the analytically generated key probabilities, sh
 
 ### Data pipeline
 
-[Has to include the *current* pipeline picture and maybe description of it]
-[Also include software pipeline]
-
-![Data pipeline](/Images/P300_Data_Flow_V3_Outdated.png)
+![Data pipeline](/Images/P300_BCI_Data_Pipeline.png)
 
 ### User experience
 
