@@ -2,6 +2,29 @@
 
 This P300-based BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
 
+## Contents
+
+* Presentation and Demonstrations
+* Technical Description
+	* Methods
+		* P300
+		* Paradigm
+		* Classification
+	* Data Collection
+	* Data Processing
+	* Data Pipeline
+	* User Experience
+	* Innovative Approaches	
+* Reproducibility
+	* Requirements
+		* BCI System Hardware
+		* Auxiliary Hardware
+	* Step-by-step to reproduce the project
+* Discussion
+	* Noteable Challenges
+	* Limitations
+	* Future Improvements
+	
 ## Presentation and Demonstrations
 
 * NeuroTechX Student Club Competition Presentation (including short demos of keyboard and overlay interfaces)
@@ -288,7 +311,7 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
 
 ## Discussion
 
-*Notable Challenges:*
+### Notable Challenges:
 
 * Using pre-existing solutions may be suboptimal; we initially used methods that have been proven to work in the literature but this was a challenge we needed to address in order to conduct novel research and advance the field by doing better than the current state-of-the-art.
   * Solution: Novel experimentation, trying many methods that have never been tried before to detemrine which one yields the best performance.
@@ -300,7 +323,7 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
 * Need of a live participant to run EEG trials
   * Solution: Simulate or stream pre-recorded data
 
-*Limitations:*
+### Limitations:
 
 * Requires eye control over the span of 1 monitor to control the keyboard or 2 monitors to control the mouse
 * User has to wear EEG headset 
@@ -309,8 +332,7 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
 * Inherent tradeoff between speed and accuracy
 * Tradeoff between fatigue and speed/accuracy
 
-
-*Future improvements:*
+### Future improvements:
 
 * Passive use detection
 * User-specific optimization of classifier hyperparameters
