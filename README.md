@@ -30,14 +30,14 @@ In order to leverage the P300 response, a paradigm must be designed that can dif
 
 Through literature review and evaluation, three drawbacks that the team identified with this format were:
 * Most individuals are not accustomed to typing on a keyboard in alpha-numeric order, which increases character aquisition time.
-	* Although users typically improve rapidly if using this format, the team hypothesized that it would be unlikely for individuals accustomed to a lifetime of QWERTY format keyboards to match their QWERTY character aquisition time.
+	* Although users typically improve rapidly if using this format, the team hypothesized that it would be unlikely for individuals accustomed to a lifetime of QWERTY format keyboards to match their QWERTY character aquisition time on an alphanumeric keyboard.
 	* For users unaccustomed to QWERTY, either format would require training to improve character aquisition time regardless.
 * Certain rows/columns are far more likely to be used for a given context.
 	* For typing out an English novel, the row A-B-C-D-E-F contains 2 vowels and 4 frequently used consonants while the row 5-6-7-8-9-_ contains no letters at all, thus, the first row would contain the desired character far more frequently.
 	* As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependendant and non-trivial.
 	* To circumvent this problem, the characters can instead be grouped randomly or based upon their current probabilities of being the desired character.
 		* Context can still be used alongside this method in order to dynamically adjust character classification thresholds (i.e. make more likely characters 'easier' to click and less likely characters 'harder' to click).
-* Simply intensifying the brightness of the character is not the most optimal ellicitation of a characterizable response signal.
+* Simply intensifying the brightness of the character is not the most optimal elicitation of a characterizable response signal.
 	* It has been shown that the facial detection response interferes constructively with the P300 response.
 		* Thus, the response can be made more detectable and its SNR can be increased by instead flashing images of faces over the characters.
 		* A 'face' can be an actual image of a human face, a drawn caricature of a face, or even 2 dots and a line oriented to look face-like.
@@ -52,11 +52,11 @@ A variety of P300 paradigms exist in practice and in the literature, some of whi
 
 ![Smiley Paradigm](/Images/P300_Smiley_Paradigm.png)
 
-* Audiovisual P300 w/ group zooming (group classification followed by individualcharacter classification)
+* Audiovisual P300 w/ group zooming (group classification followed by individual character classification)
 
 ![Audiovisual Paradigm](/Images/Audiovisual_P300_Paradigm.png)
 
-* Negative intensity visual P300 response (expected response is a change, oddball response is a sudden lack of change)
+* Negative expectation visual P300 response (expected response is a change, oddball response is a sudden lack of change)
 
 ![Inverted Oddball Paradigm](/Images/P300_Inverted_Oddball_Paradigm.png)
 
@@ -65,10 +65,11 @@ Per the above information and through literature review, the team designed the f
 * Paradigm for the keyboard interface
 	* Keyboard layout: QWERTY (plus some special characters and a row for word suggestions)
 		* Pro(s)
-			* Faster character aquisition time.
+			* Faster character aquisition time than alpha-numeric.
 			* Easier to use for most users / less learning curve.
 		* Con(s)
 			* Rectangular: may force a sub-optimal distance between characters in order to fit to a more square screen
+			* *May* not be the most optimal layout (dvorak, colemak, or other may be superior for average character aquisition time, despite the learning curve)
 	* Flash image: League of Legends character faces
 		* Pro(s)
 			* Varying between one of several faces: more 'unexpected' oddball should elicit a stronger P300 response
@@ -77,14 +78,62 @@ Per the above information and through literature review, the team designed the f
 			* The member(s) of the team using the BCI were all familiar with the characters and instinctively recognized the images as faces.
 		* Con(s)
 			* Unclear if a user unfamiliar with the characters would recognize the images as 'faces.'
+				* Solution: find other faces to use. (unimplemented/future)
 			* Probably best not to use copyrighted images in a full-release version.
+				* Solution: find other faces to use. (unimplemented/future)
 	* Flash image border: randomized color 
 		* Pro(s)
 			* Flashing a randomized color with the image should make the oddball more 'unexpected'
 		* Con(s)
 			* A random color means the border can blend with the character image or blend between the character and black background, lessening the perceived intensity of the abrupt change.
-				* This can be alleviated by using a pseudo-random image border (unimplemented/future)
-
+				* This can be alleviated by using a pseudo-random image border based upon the foreground & background color. (unimplemented/future)
+	* Flash groups: flash the most probable character + N least probable characters, then remove those characters and repeat with the remaining characters until all have been flashed, then restart
+		Pro(s)
+			* Ensures that discriminatory information is gained between the most probable characters.
+				* e.g. if 'A' is calculated to be a 50% chance of being the desired character and 'B' is calculated to be a 50% chance of being the desired character and all other characters are calculated to be 0%, then no information is gained if 'A' and 'B' are randomly flashed together; guaranteeing they are separate guarantees discriminatory information gain.
+			* This method still flashes all characters with the same frequency, ensuring no bias is applied to any given character.
+		Con(s)
+			* Greedy algorithm: there may be a more optimal method of maximizing discriminatory information gained. (unimplemented/future)
+	* Dynamically thresholding with NLP (i.e. decrease the threshold of more-likely characters to make them easier to click and increase the threshold of less-likely characters to make them harder to click) (currently implemented in legacy code only)
+		* Pro(s)
+			* When in the correct context, can substantially increase information transfer rate.
+		* Con(s)
+			* When in the incorrect context, (e.g. using English NLP while typing a username and password), can substantially decrease information transfer rate.
+				* Currently alleviated by adding an NLP toggle to the keyboard to disable NLP when typing natural English sentences (tradeoff con: adding an extra key slightly increases error rate)
+	* Future
+		* 'Highlight' the character which is currently most probable or closest to its threshold value. If the user triggers a 'select,' instantly select the highlighted character regardless of whether or not it has exceeded its threshold.
+			* This should substantially increase information transfer rate, but requires a successful hybridization scheme (i.e. a non-P300 signal must be utilized in order to detect the 'select' trigger).
+			* Easy solutions would be to have the user blink/close their eyes/clench their jaw if they wanted to select the highlighted character, as these are all detectable by EEG.
+				* The team felt this went against the spirit of the NTX competition, and also noted that it would not assist individuals with sufficient paralysis to make these tasks non-trivial.
+			* Another proposal is to change the intensity of the highlighted character sinusoidally and use SSVEP analysis to detect if the user is looking at it.
+				* This allows the keyboard to maintain a high number of keys, as only the proposed key is being sinusoidally intensified. (The number of discriminable options viable for use is a common challenge to SSVEP paradigms.)
+				* This also requires nothing additional of the user, as they are already looking at the key.
+			* Another proposal is to use a focus-based auditory stimulus or even an oddball auditory stimulus to have the user actively trigger the 'select.'
+				* Such a paradigm may be more challenging or require more focus for the user to use the BCI, but it is still a potential alternative to the previous proposal in order to attempt to increase the information transfer rate.
+		* Optimize the UI (character spacing, character sizing, character coloring, flash frequency, flash duration, etc.)
+			* Each of these can only be optimized experimentally.
+				* The current UI was generated after two days of testing and based primarily on user feedback.
+				* Each UI variable must be individually varied, and the results analyzed, in order to determine the optimal UI.
+				* (A theoretically optimal flash frequency can be determined analytically based upon the signature P300 response, but that would necessarily assume that the signature was independent of the flash frequency, which the team did not observe to be true.)
+* Paradigm for the overlay (mouse/monitor) interface
+	* The team found no general-purpose mouse use interface. This lack of pre-existing literature means many of the design decisions for this interface are unjustified or based primarily on intuition/hypothesis.
+		* The pre-existing paradigms the team found for mouse click interfaces were:
+			* Application specific/highly tokenized
+				* Only allowed for the user to click tokenized positions, which is not helpful when there are multiple applications running, a very high number of clickable tokens, or, most importantly, if the user wants to use an application which is not tokenizable by the BCI.
+				* Notably, and fairly, application specific mouse clicking is optimal when possible
+					* In the example of the chess game, it is optimal to only flash the moveable pieces, then where the piece can move (as well as an 'undo' button) instead of flashing the whole screen.
+					* By analogy, what the team's BCI lacks in brevity, it makes up for with completeness.
+			* Move mouse by selection
+				* Offer the user up, down, left, right, up-right, up-left, down-right, down-left, and various click options.
+				* The mouse jumps to the nearest token in the direction selected, the user can then register the appropriate click.
+				* This suffers from all of the same problems as the previous method, but is generally worse given the slow rate token traversal (this method is akin to always tabbing through your web browser to navigate).
+				* This method has the *ability* to be generalized by instead moving the mouse some amount, instead of snapping to a token. The team hypothesized that this method would be unacceptably slow.
+	* The paradigm is fundamentally the same as the keyboard interface, with the following changes:
+		* Layout:
+			* monitor A is mirrored onto a portion (the majority) of monitor B
+			* extra options (left/right click, tab, enter, open keyboard, zoom out) are available on the edges of the screen
+			* the mirror on monitor B is overlaid with a grid to cut the screen up into cells
+			* the cells 
 #### Classification
 
 ### Data Collection
