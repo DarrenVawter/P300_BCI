@@ -1,5 +1,7 @@
 # CruX @ UCLA P300 BCI 
 
+This P300-based BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
+
 ## Presentation and Demonstrations
 
 * NeuroTechX Student Club Competition Presentation (including short demos of keyboard and overlay interfaces)
@@ -11,8 +13,40 @@
   
 ## Technical Description
 
+### Data Pipeline
 
-![External Triggering Circuit](/Images/Triggering_Circuit.png)
+TODO: update data pipeline image to V4
+![Data pipeline](/Images/P300_Data_Flow_V3_Outdated.png)
+
+### Methods
+
+#### P300
+
+The P300 (or P3) response is an event related electrical potential measurable on the scalp, primarily detectable near the occipital, parietal, and central regions. The 'event' which triggers a P300 can be any unexpected or 'oddball' stimulus. The 'P' in P300 refers to the fact that inflection in potential is positive. The '300' in P300 refers to the fact that the P300 response is usually detectable ~300ms after onset of the oddball stimulus. What constititutes an oddball stimulus to the brain is non-trivial to parameterize. Examples include listening to a constant tone which is interrupted with sporadic beeps, staring at a red street light when it suddenly turns green, or looking at a static image which is sporadically 'flashed.' In this context, 'flashed' can mean having the brightness of the static image increase or having a different color or image abruptly appear over the original static image for a short period of time (10ms-30ms). For the remainder of this document, 'flash' will refer to abruptly and briefly covering up the static image with a different image.
+![P300 Response Example](/Images/P300_Response_Sample.png.png) ![Target vs Non-target Response Example](/Images/Target_vs_Non_Target.png)
+
+
+#### Paradigm
+
+In order to leverage the P300 response, a paradigm must be designed that can differentiate information by detecting responses to unexpected stimuli. While this is possible with 
+
+#### Classification
+
+### Data Collection
+
+- trigger synchronization
+  - external circuit
+  - DRBG algorithm
+  
+### Data Processing
+
+- core python components
+  - Cyton_Data_Packager.py
+  - P300_Processor.py
+  - BCI_Controller.py
+
+
+
 
 This BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
 
@@ -27,10 +61,6 @@ The third figure shows that the probability estimates from the first and second 
 The fourth figure shows the bivariate histograms (drawn on the same plane to illustrate the separation of means), which can be used to generate bivariate normal statistics to estimate a probability that a given trial is a target trial given some 1st and 2nd correlation coefficients. We say that using n iterations of cross correlation to generate an estimate is using nth degree correlation. Thus, this is using 2nd degree correlation. Also verifying that new information is gained, the average magnitude of the ‘distance’ between two points from the two different distributions is greater in this 2-dimensional frame than in the 1 dimensional frame on the previous page. Much like parsing the light apart from two stars near to one another when viewed through a telescope, this increase in separation yields a greater ability to discriminate which sample came from which distribution.
 
 The fifth figure validates that the analytically generated key probabilities, shown in blue, closely match the actual percentage of positive trials at that generated probability, shown in orange. This confirms the appropriateness of performing these statistical analyses on the correlation results to generate key probabilities. By then treating each of the stimuli as independent trials and compounding samples over time, the target key probability will eventually converge to 100% and all other keys to 0%. The optimization problem then becomes choosing key decision thresholds (displayed probabilities generated using 3rd degree correlation and corresponding trivariate normal distributions).
-
-### Data pipeline
-
-![Data pipeline](/Images/P300_BCI_Data_Pipeline.png)
 
 ### User experience
 
@@ -74,7 +104,8 @@ The fifth figure validates that the analytically generated key probabilities, sh
 ### Step-by-step to reproduce the project
 * Download source code
 * Download Python dependencies
-* Assemble external triggering circuit (see technical description above for schematic)
+* Assemble external circuit
+* ![External Triggering Circuit](/Images/circuit.png)
 * Connect OpenBCI EEG cap to Cyton board
   * Channels: 
     * White - REF
