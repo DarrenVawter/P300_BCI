@@ -190,10 +190,9 @@ Above is a visualization of how the classifier signals are generated.
 ### Data Collection
 
 * Trigger Synchronization
-  * ![External Triggering Circuit](/Images/circuit.png)
-  
-	
-  - DRBG algorithm
+	* ![External Triggering Circuit](/Images/Triggering_Circuit.png)	
+	* The above circuit serves to send signals with the software (utilizing the FTDI chip) to tag the incoming hardware samples with synchronization tags. 
+	* Using DRBGs (with twister algo) to tag hardware and software trials separately. If tags mis-match at some point: sync is lost. Maximum back-correlation of hardware/software tags will identify the minimum number of trials to drop in order to guarantee that no bad packets are used.
   
 ### Data Processing
 
