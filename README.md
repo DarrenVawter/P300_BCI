@@ -75,7 +75,7 @@ The fifth figure validates that the analytically generated key probabilities, sh
 * Download source code
 * Download Python dependencies
 * Assemble external circuit 
-  *[picture here]
+  *![External Triggering Circuit](/Images/circuit.png)
 * Connect OpenBCI EEG cap to Cyton board
   * Channels: 
     * White - REF
