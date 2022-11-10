@@ -18,22 +18,25 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 #### P300
 
 The P300 (or P3) response is an event related electrical potential measurable on the scalp, primarily detectable near the occipital, parietal, and central regions. The 'event' which triggers a P300 can be any unexpected or 'oddball' stimulus. The 'P' in P300 refers to the fact that inflection in potential is positive. The '300' in P300 refers to the fact that the P300 response is usually detectable ~300ms after onset of the oddball stimulus. What constititutes an oddball stimulus to the brain is non-trivial to parameterize. Examples include listening to a constant tone which is interrupted with sporadic beeps, staring at a red street light when it suddenly turns green, or looking at a static image which is sporadically 'flashed.' In this context, 'flashed' can mean having the brightness of the static image increase or having a different color or image abruptly appear over the original static image for a short period of time (10ms-30ms). For the remainder of this document, 'flash' will refer to abruptly and briefly covering up the static image with a different image.
+
 ![P300 Response Example](/Images/P300_Response_Sample.png) ![Target vs Non-target Response Example](/Images/Target_vs_Non_Target_Response.PNG)
 
 
 #### Paradigm
 
 In order to leverage the P300 response, a paradigm must be designed that can differentiate information by detecting responses to unexpected stimuli. The first, and now somewhat canonical, paradigm developed for this puprose was by Farwell and Donchin. It features N columns and N rows of characters. Each group of characters in a single row or column then his its brightness intensified. Ostensibly then, if the user is looking at that row/column, the intensification would generate a measurable P300 response. Since the detection of a P300 response is highly probabilistic due to both signal variance and the low SNR of EEG, this is performed repeatedly and the most probable row and most probable column are tracked until some threshold criteria is met. At that point, the character at the intersection of the most probable row and column is classified as the desired character.
+
 ![Farwell and Donchin Paradigm](/Images/Farwell_and_Donchin_Paradigm.png)
+
 Two drawbacks that the team identified with this format were:
 * Most individuals are not accustomed to typing on a keyboard in alpha-numeric order, which increases character aquisition time.
- * Although users typically improve rapidly if using this format, the team hypothesized that it would be unlikely for individuals accustomed to a lifetime of QWERTY format keyboards to match their QWERTY character aquisition time.
- * For users unaccustomed to QWERTY, either format would require training to improve character aquisition time regardless.
+	* Although users typically improve rapidly if using this format, the team hypothesized that it would be unlikely for individuals accustomed to a lifetime of QWERTY format keyboards to match their QWERTY character aquisition time.
+	* For users unaccustomed to QWERTY, either format would require training to improve character aquisition time regardless.
 * Certain rows/columns are far more likely to be used for a given context.
- * For typing out an English novel, the row A-B-C-D-E-F contains 2 vowels and 4 frequently used consonants while the row 5-6-7-8-9-_ contains no letters at all, thus, the first row would contain the desired character far more frequently.
- * As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependendant and non-trivial.
- * To circumvent this problem, the characters can instead be grouped randomly or based upon their current probabilities of being the desired character.
-  * Context can still be used alongside this method in order to dynamically adjust character classification thresholds (i.e. make more likely characters 'easier' to click and less likely characters 'harder' to click).
+	* For typing out an English novel, the row A-B-C-D-E-F contains 2 vowels and 4 frequently used consonants while the row 5-6-7-8-9-_ contains no letters at all, thus, the first row would contain the desired character far more frequently.
+	* As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependendant and non-trivial.
+	* To circumvent this problem, the characters can instead be grouped randomly or based upon their current probabilities of being the desired character.
+		* Context can still be used alongside this method in order to dynamically adjust character classification thresholds (i.e. make more likely characters 'easier' to click and less likely characters 'harder' to click).
 
 #### Classification
 
