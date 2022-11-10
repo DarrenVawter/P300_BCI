@@ -21,10 +21,9 @@ The P300 (or P3) response is an event related electrical potential measurable on
 
 ![P300 Response Example](/Images/P300_Response_Sample.png) ![Target vs Non-target Response Example](/Images/Target_vs_Non_Target_Response.PNG)
 
-
 #### Paradigm
 
-In order to leverage the P300 response, a paradigm must be designed that can differentiate information by detecting responses to unexpected stimuli. The first, and now somewhat canonical, paradigm developed for this puprose was by Farwell and Donchin. It features N columns and N rows of characters. Each group of characters in a single row or column then his its brightness intensified. Ostensibly then, if the user is looking at that row/column, the intensification would generate a measurable P300 response. Since the detection of a P300 response is highly probabilistic due to both signal variance and the low SNR of EEG, this is performed repeatedly and the most probable row and most probable column are tracked until some threshold criteria is met. At that point, the character at the intersection of the most probable row and column is classified as the desired character.
+In order to leverage the P300 response, a paradigm must be designed that can differentiate information by detecting responses to unexpected stimuli. The first, and now somewhat canonical, paradigm developed for this puprose was by Farwell and Donchin. It features N columns and N rows of characters. Each group of characters in a single row or column then his its brightness intensified. Ostensibly then, if the user is looking at that row/column, the intensification would generate a measurable P300 response. Since the detection of a P300 response is highly probabilistic due to both signal variance and the low SNR of EEG, this is performed repeatedly and the most probable row and most probable column are tracked until some threshold criteria is met. At that point, the character at the intersection of the most probable row and column is classified as the desired character. An added benefit of flashing rows and columns is that the square root of the number of options is checked per trial. This should be the optimal group number as per the same logic of Van Emde Boas search trees. This is non-trivial to explain and not highly relevant to the technical details of this project. If interested, the canonical computer science two-coconut riddle and solution is explained here: https://medium.com/@jonaszk/how-fast-82aaa1e8a3d1 
 
 ![Farwell and Donchin Paradigm](/Images/Farwell_and_Donchin_Paradigm.png)
 
@@ -62,9 +61,7 @@ A variety of P300 paradigms exist in practice and in the literature, some of whi
 
 Per the above information and through literature review, the team designed the following two paradigms
 
-![Keyboard Interface Sample](/Images/Keyboard_Interface.jpg)
-
-* Paradigm for the keyboard interface (See video in Presentation and Demonstrations.)
+* Paradigm for the keyboard interface (See video in Presentation and Demonstrations, see photo below.)
 	* Keyboard layout: QWERTY (plus some special characters and a row for word suggestions)
 		* Pro(s)
 			* Faster character aquisition time than alpha-numeric.
@@ -118,9 +115,9 @@ Per the above information and through literature review, the team designed the f
 				* Each UI variable must be individually varied, and the results analyzed, in order to determine the optimal UI.
 				* (A theoretically optimal flash frequency can be determined analytically based upon the signature P300 response, but that would necessarily assume that the signature was independent of the flash frequency, which the team did not observe to be true.)
 
-![Overlay Interface Sample](/Images/Overlay_Interface.jpg)
+![Keyboard Interface Sample](/Images/Keyboard_Interface.jpg)
 
-* Paradigm for the overlay (mouse/monitor) interface (See video in Presentation and Demonstrations.)
+* Paradigm for the overlay (mouse/monitor) interface (See video in Presentation and Demonstrations, see photo below.)
 	* The team found no general-purpose mouse use interface. This lack of pre-existing literature means many of the design decisions for this interface are unjustified or based primarily on intuition/hypothesis.
 		* The pre-existing paradigms the team found for mouse click interfaces were:
 			* Application specific/highly tokenized
@@ -156,9 +153,11 @@ Per the above information and through literature review, the team designed the f
 				* (e.g. when playing chess, only flash the moveable pieces, then where they can move to, and a couple of special sidebar options.)
 			* Special sidebar options.
 				* (e.g. when Google Chrome is the focused window, have sidebar options for refresh, new tab, back, etc.)
+		* Don't flash the unused (solid black) tiles. (duh) (important, but non-essential, todo, unimplemented)
 		* Optimize the UI (same comments as keyboard interface).
 		* Highlight the currently most probable cell (same comments as keyboard interface).
 		
+![Overlay Interface Sample](/Images/Overlay_Interface.jpg)
 		
 #### Classification
 
