@@ -11,6 +11,9 @@
   
 ## Technical Description
 
+
+![External Triggering Circuit](/Images/Triggering_Circuit.png)
+
 This BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
 
 The data listed in the report introduce and justify the core of the logic behind our BCI’s classification method. Not included (for the sake of length), however, are several methods for classification that were implemented, tested, and shown to be ineffective or not as effective as the chosen method. Also not included are details on how GPT-NEO was used as a causal language model to produce word suggestions, how character n-grams were used to produce dynamic character thresholds, how probabilities were dynamically weighted to reduce type-I errors, how the signal characteristics were updated while making live classifications, or technical details such as trigger and synchronization handling. Lastly, not included is the reasoning behind or explanation why iterative cross correlation reduces inter-trial interference, inter-stimulus interference, and training time.
@@ -71,8 +74,7 @@ The fifth figure validates that the analytically generated key probabilities, sh
 ### Step-by-step to reproduce the project
 * Download source code
 * Download Python dependencies
-* Assemble external circuit
-* ![External Triggering Circuit](/Images/circuit.png)
+* Assemble external triggering circuit (see technical description above for schematic)
 * Connect OpenBCI EEG cap to Cyton board
   * Channels: 
     * White - REF
