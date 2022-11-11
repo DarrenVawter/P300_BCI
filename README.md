@@ -245,7 +245,9 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
 
 ### Innovative approaches
 
-[Talk about iterative cross correlation, DRBG algo, and mouse click method]
+* Iterative cross correlation for P300 detection
+* Deterministic Random Bit Generator (DRBG) algorithm for data stream and GUI stream synchronization
+* Mouse click method
 
 ## Reproducibility
 
