@@ -10,20 +10,20 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 		* [P300](#P300)
 		* [Paradigm](#Paradigm)
 		* [Classification](#Classification)
-	* Data Collection
-	* Data Processing
-	* Data Pipeline
-	* User Experience
-	* Innovative Approaches	
-* Reproducibility
-	* Requirements
-		* BCI System Hardware
-		* Auxiliary Hardware
-	* Step-by-step to reproduce the project
-* Discussion
-	* Noteable Challenges
-	* Limitations
-	* Future Improvements
+	* [Data Collection](#Data-Collection)
+	* [Data Processing](#Data-Processing)
+	* [Data Pipeline](#Data-Pipeline)
+	* [User Experience](#User-Experience)
+	* [Innovative Approaches](#Innovative-Approaches)	
+* [Reproducibility](#Reproducibility)
+	* [Requirements](#Requirements)
+		* [BCI System Hardware](#BCI-System-Hardware)
+		* [Auxiliary Hardware](#Auxiliary-Hardware)
+	* [Step-by-step to reproduce the project](#Step-by-step-to-reproduce-the-project)
+* [Discussion](#Discussion)
+	* [Noteable Challenges](#Noteable-Challenges)
+	* [Limitations](#Limitations)
+	* [Future Improvements](#Future-Improvements)
 	
 ## Presentation and Demonstrations
 
