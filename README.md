@@ -56,7 +56,7 @@ Through literature review and evaluation, three drawbacks that the team identifi
 	* For users unaccustomed to QWERTY, either format would require training to improve character aquisition time regardless.
 * Certain rows/columns are far more likely to be used for a given context.
 	* For typing out an English novel, the row A-B-C-D-E-F contains 2 vowels and 4 frequently used consonants while the row 5-6-7-8-9-_ contains no letters at all, thus, the first row would contain the desired character far more frequently.
-	* As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependendant and non-trivial.
+	* As a result, either the frequency of flashing of each row/column should be conditioned on the probability that it contains the desired character or the thresholding criteria must be adjusted to account for the unequal frequency of occurence of each row. This task is highly context-dependent and non-trivial.
 	* To circumvent this problem, the characters can instead be grouped randomly or based upon their current probabilities of being the desired character.
 		* Context can still be used alongside this method in order to dynamically adjust character classification thresholds (i.e. make more likely characters 'easier' to click and less likely characters 'harder' to click).
 * Simply intensifying the brightness of the character is not the most optimal elicitation of a characterizable response signal.
