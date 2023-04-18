@@ -4,7 +4,7 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 
 ## Contents
 
-* Presentation and Demonstrations
+* [Presentation and Demonstrations](#Presentation-and-Demonstrations)
 * [Technical Description](#Technical-Description)
 	* Methods
 		* P300
