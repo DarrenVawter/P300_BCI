@@ -20,6 +20,7 @@ This P300-based BCI allows a user wearing an EEG to visually control a keyboard 
 		* [BCI System Hardware](#BCI-System-Hardware)
 		* [Auxiliary Hardware](#Auxiliary-Hardware)
 	* [Step-by-step to reproduce the project](#Step-by-step-to-reproduce-the-project)
+	* [Troubleshooting](#Troubleshooting)
 * [Discussion](#Discussion)
 	* [Notable Challenges](#Notable-Challenges)
 	* [Limitations](#Limitations)
@@ -309,7 +310,10 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
  * The first time the user opens up keyboard mode (i.e. without pre-trained data) it will enter "keyboard calibration" mode.
  * Once calibrated, the program will continuously attempt to make classifications of which key the user is looking at.
  * Upon closing the GUI, all modules will close.
- 
+
+### Troubleshooting
+ * COM port
+ * END BYTE 
 
 ## Discussion
 
