@@ -311,9 +311,13 @@ The above circuit serves to send signals with the software (utilizing the FTDI c
  * Once calibrated, the program will continuously attempt to make classifications of which key the user is looking at.
  * Upon closing the GUI, all modules will close.
 
-### Troubleshooting
+### Troubleshooting 
+ * IDE
+  * This project was created with Spyder. Other IDEs like PyCharm might have trouble with some of the dependencies. The use of Spyder is recommended.
  * COM port
- * END BYTE 
+  * The COM port of the bluetooth dongle needs to be checked and edited in Cyton_Data_Packager.py. First, go to Device Manager and find the new COM port being added to the Ports (COM & LPT). Then, change the COM port in Cyton_Data_Packager.py correspondingly with the code cyton = OpenBCICyton(port='COMX'), replace X with the number of COM port.
+ * END BYTE warning
+  * If this following warning pops up when running Cyton_Data_Packager.py: Warning: ID:<158> <Unexpected END_BYTE found <142> instead of <192>, then you need to manually change the END_BYTE constant in the pyOpenBCI library. To find the directory of the library, use the following code: import pyOpenBCI; print(pyOpenBCI.__file__); Navigate to the folder containing the file and go to cyton.py. In the # Define variables section, change the END_BYTE from 0xC0 to 0xC1.
 
 ## Discussion
 
