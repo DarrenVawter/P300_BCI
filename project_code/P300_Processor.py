@@ -132,6 +132,17 @@ def Start():
                           
         # End of Shutdown_Controller
         console.critical("Processor shutdown complete.");
+        
+        #TODO: remove
+        try:
+            
+            while(True):
+                time.sleep(.1);
+                
+        except KeyboardInterrupt:
+            
+            pass;
+            
         pass;
         
     #############################
@@ -1119,7 +1130,7 @@ def Start():
             
             # Weight previous probabilities
             #TODO: determine weighting coefficient
-            cell_probabilities[:] = old_probabilities[:] * 0.1 + cell_probabilities[:] * 0.9;
+            cell_probabilities[:] = old_probabilities[:] * 0.15 + cell_probabilities[:] * 0.85;
 
             most_probable_cell = np.argmax(cell_probabilities);         
             #console.warning(str(most_probable_cell)+": "+str(np.amax(cell_probabilities))+"\n"+str(cell_probabilities));

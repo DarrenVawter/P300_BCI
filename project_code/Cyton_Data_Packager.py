@@ -129,6 +129,17 @@ def Start():
                          
         # End of Shutdown_Cyton_Data_Packager
         console.critical("Cyton data packager shut down.");
+
+        #TODO: remove
+        try:
+            
+            while(True):
+                time.sleep(.1);
+                
+        except KeyboardInterrupt:
+            
+            pass;
+            
         pass;
     
     def Run():

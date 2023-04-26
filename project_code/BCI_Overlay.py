@@ -104,7 +104,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
         nonlocal flash_bucket, current_flash_group, exclude_bucket;
         
         for i in range (N_TILES_PER_FLASH):
-            current_flash_colors[i] = (random.randint(0,255),random.randint(0,255),random.randint(0,255));
+            current_flash_colors[i] = (random.randint(100,255),random.randint(100,255),random.randint(100,255));
         
         # Check if the number of tiles available to flash is <= the tiles per flash
         if(len(flash_bucket) <= N_TILES_PER_FLASH):
@@ -354,7 +354,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
     FLASH_IMAGES = [None] * N_FLASH_IMAGES
     for i in range(N_FLASH_IMAGES):
         FLASH_IMAGES[i] = pygame.image.load('league_icons/'+str(i)+'.jpg')
-        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH*3/4, TILE_HEIGHT*3/4));
+        FLASH_IMAGES[i] = pygame.transform.scale(FLASH_IMAGES[i], (TILE_WIDTH*10/20, TILE_HEIGHT*10/20));
         
     # Load and scale interaction icons
     BCI_INTERACTION_ICONS = [None] * N_BCI_CONTROLS
@@ -569,7 +569,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 if(floor(classification_id/N_TILE_COLUMNS) == N_TILE_ROWS-1):
                 
                     if(classification_id%N_TILE_COLUMNS > N_OVERLAY_CONTROLS-1):
-                        continue;  
+                        Generate_TTS("Darren. Oh my God. Please fix thix bug already.");
+                        pass;  
                              
                     else:                
                         # Convert control to overlay interaction
@@ -592,7 +593,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 elif(classification_id%N_TILE_COLUMNS == N_TILE_COLUMNS-1):
 
                     if(floor(classification_id/N_TILE_COLUMNS) > N_BCI_CONTROLS-1):
-                        continue;   
+                        Generate_TTS("Darren. Oh my God. Please fix thix bug already.");
+                        pass;
                         
                     else:
                         # Convert control to BCI interaction
@@ -658,11 +660,11 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                     #TODO: find a way less ghetto solution than this
                     # Force-refresh the main screen by quickly alt-tabbing
                     pyautogui.keyDown('alt');
-                    pyautogui.keyDown('tab');
+                    pyautogui.press('tab');
                     pyautogui.press('esc');
-                    pyautogui.keyUp('tab');
+                    #pyautogui.keyUp('tab');
                     pyautogui.keyUp('alt');
-                    
+
                     # Move the mouse to the center of the mirror to show where a click would be
                     #TODO: add this back in later
                     #pyautogui.moveTo(-SCREEN_WIDTH+OVERLAY_WIDTH/2,OVERLAY_HEIGHT/2);
@@ -862,6 +864,17 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
             # Renderthe appropriate overlay control icon
             canvas.blit(OVERLAY_INTERACTION_ICONS[i],[round((i+0.5)*TILE_WIDTH-OVERLAY_ICON_WIDTH[i]/2), round((N_TILE_ROWS-0.5)*TILE_HEIGHT-OVERLAY_ICON_HEIGHT[i]/2), OVERLAY_ICON_WIDTH[i], OVERLAY_ICON_HEIGHT[i]]);       
         
+        ###########################
+        #   Render focus points   #
+        ###########################
+        
+        #TODO: show the screen without borders/focus points for X ms then apply
+        for row in range(N_TILE_ROWS):
+            for col in range(N_TILE_COLUMNS):
+                # Render the flash images border
+                pygame.draw.rect(canvas, BLACK, [col*TILE_WIDTH+TILE_WIDTH*9/40, row*TILE_HEIGHT+TILE_HEIGHT*9/40, TILE_WIDTH*11/20, TILE_HEIGHT*11/20]);
+                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/4, row*TILE_HEIGHT+TILE_HEIGHT/4, TILE_WIDTH*2/4, TILE_HEIGHT*2/4]);
+
         # Check the target timer
         
         if(time.time()-target_timer < TARGET_TIME):
@@ -879,8 +892,8 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 col = target_tile % N_TILE_COLUMNS;
                 
                 # Render the flash images border
-                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
-                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                pygame.draw.rect(canvas, RED, [col*TILE_WIDTH+TILE_WIDTH*9/40, row*TILE_HEIGHT+TILE_HEIGHT*9/40, TILE_WIDTH*11/20, TILE_HEIGHT*11/20]);
+                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/4, row*TILE_HEIGHT+TILE_HEIGHT/4, TILE_WIDTH/2, TILE_HEIGHT/2]);
                 
             # Else, continually reset the target timer 
             else:
@@ -900,10 +913,10 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 col = current_flash_group[i] % N_TILE_COLUMNS;
                 
                 # Render the flash image's random color border
-                pygame.draw.rect(canvas, current_flash_colors[i], [col*TILE_WIDTH+TILE_WIDTH/12, row*TILE_HEIGHT+TILE_HEIGHT/12, TILE_WIDTH*5/6, TILE_HEIGHT*5/6]);
+                pygame.draw.rect(canvas, current_flash_colors[i], [col*TILE_WIDTH+TILE_WIDTH*8/40, row*TILE_HEIGHT+TILE_HEIGHT*8/40, TILE_WIDTH*12/20, TILE_HEIGHT*12/20]);
                 
                 # Render the corresponding flash image
-                canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH+TILE_WIDTH/8, row*TILE_HEIGHT+TILE_HEIGHT/8, TILE_WIDTH*3/4, TILE_HEIGHT*3/4]);      
+                canvas.blit(FLASH_IMAGES[flash_image_indices[i]],[col*TILE_WIDTH+TILE_WIDTH*10/40, row*TILE_HEIGHT+TILE_HEIGHT*10/40, TILE_WIDTH*10/20, TILE_HEIGHT*10/20]);      
         
             ###################################
             #   Finalize and draw the frame   #
@@ -944,7 +957,7 @@ def Run(UM232R, canvas, magnification_rect, stimuli_outlet, processor_inlet):
                 
                 # Render the flash images border
                 pygame.draw.rect(canvas, RED, [col*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT]);
-                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/10, row*TILE_HEIGHT+TILE_HEIGHT/10, TILE_WIDTH*4/5, TILE_HEIGHT*4/5]);
+                pygame.draw.rect(canvas, GRAY, [col*TILE_WIDTH+TILE_WIDTH/4, row*TILE_HEIGHT+TILE_HEIGHT/4, TILE_WIDTH*2/4, TILE_HEIGHT*2/4]);
                 
             ###################################
             #   Finalize and draw the frame   #

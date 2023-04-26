@@ -159,6 +159,18 @@ def Start():
         
         # End of Shutdown_Controller
         console.critical("BCI shutdown complete.");
+        
+        
+        #TODO: remove
+        try:
+            
+            while(True):
+                time.sleep(.1);
+                
+        except KeyboardInterrupt:
+            
+            pass;
+        
         pass;
         
     #TODO: Run() docstring
@@ -315,6 +327,7 @@ def Start():
     except Exception as e:
     
         console.error("Unhandled error raised.");
+        console.error(e);
         
         # An exception was raised, properly shutdown the BCI
         Shutdown_Controller();
