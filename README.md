@@ -2,6 +2,14 @@
 
 This P300-based BCI allows a user wearing an EEG to visually control a keyboard and mouse in a normal computer environment.
 
+## Sample Clips
+
+### Full Setup & Mouse Interface Demonstration
+www.linkedin.com/posts/d-vawter_so-i-played-a-game-of-chess-using-only-my-activity-6996454980358483968-v6T-
+
+### Keyboard Interface Demonstration
+www.linkedin.com/posts/d-vawter_its-always-hard-to-show-off-something-before-activity-6969639581784690688-Xx36
+
 ## Contents
 
 * [Presentation and Demonstrations](#Presentation-and-Demonstrations)
