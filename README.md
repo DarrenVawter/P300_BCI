@@ -12,7 +12,6 @@ www.linkedin.com/posts/d-vawter_its-always-hard-to-show-off-something-before-act
 
 ## Contents
 
-* [Presentation and Demonstrations](#Presentation-and-Demonstrations)
 * [Technical Description](#Technical-Description)
 	* [Methods](#Methods)
 		* [P300](#P300)
@@ -33,15 +32,6 @@ www.linkedin.com/posts/d-vawter_its-always-hard-to-show-off-something-before-act
 	* [Notable Challenges](#Notable-Challenges)
 	* [Limitations](#Limitations)
 	* [Future Improvements](#Future-Improvements)
-	
-## Presentation and Demonstrations
-
-* NeuroTechX Student Club Competition Presentation (including short demos of keyboard and overlay interfaces)
-  * https://drive.google.com/file/d/1K0_7yf0yF9sV8O8vak3vLr-YgmjuWkfi/view?usp=share_link
-* Keyboard interface demonstration using NLP and word suggestions (w/ intro)
-  * https://drive.google.com/file/d/1oyYfFMhPj219BxCBmprONrwqLPeU8vo1/view?usp=share_link
-* Overlay interface demonstration (no intro)
-  * https://drive.google.com/file/d/1g3a3haj1WufKYOtaX_5pQ6jYdXAm_rGc/view?usp=share_link
   
 ## Technical Description
 
